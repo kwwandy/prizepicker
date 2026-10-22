@@ -20,9 +20,11 @@ assert.deepEqual(e[0].m, [1, 22, 33, 44, 50]); assert.deepEqual(e[0].b, [2, 12])
 const tb = 'DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Thunderball,DrawNumber\n17-Oct-2026,28,9,18,23,27,1,3993\n';
 assert.ok(checkRow('tb', parseUkCsv(tb, 'tb')[0]));
 
-const xml = '<?xml version="1.0"?><draw-results><game type="lotto"><draw><draw-number>3217</draw-number><draw-date>2026-10-21</draw-date></draw><balls><set>L1</set><ball number="1">21</ball><ball number="2">28</ball><ball number="3">3</ball><ball number="4">40</ball><ball number="5">9</ball><ball number="6">12</ball><ball number="7">18</ball></balls></game></draw-results>';
+const xml = '<?xml version="1.0"?><draw-results><game type="lotto"><draw><draw-number>3217</draw-number><draw-date>2026-10-21</draw-date></draw><balls><set>L1</set><ball number="1">21</ball><ball number="2">28</ball><ball number="3">29</ball><ball number="4">37</ball><ball number="5">48</ball><ball number="6">57</ball><bonus-ball type="bonusball" number="1">25</bonus-ball></balls><balls><set>L2</set><ball number="1">4</ball><ball number="2">38</ball><ball number="3">43</ball><ball number="4">45</ball><ball number="5">51</ball><ball number="6">58</ball><bonus-ball type="bonusball" number="1">30</bonus-ball></balls></game></draw-results>';
 const x = parseUkXml(xml, 'lotto');
-assert.deepEqual(x[0], { date: '2026-10-21', dn: 3217, m: [3, 9, 12, 21, 28, 40], b: [18] });
+assert.deepEqual(x[0], { date: '2026-10-21', dn: 3217, m: [21, 28, 29, 37, 48, 57], b: [25] });
+const xe = '<draw-results><game type="euro"><draw><draw-number>1991</draw-number><draw-date>2026-10-20</draw-date></draw><balls><set>14</set><ball number="1">9</ball><ball number="2">15</ball><ball number="3">16</ball><ball number="4">37</ball><ball number="5">43</ball><bonus-ball type="luckystar" number="1">7</bonus-ball><bonus-ball type="luckystar" number="2">10</bonus-ball></balls><raffle number="1">VPKN28846</raffle></game></draw-results>';
+assert.deepEqual(parseUkXml(xe, 'euro')[0].b, [7, 10]);
 
 const sfl = 'DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Life Ball,DrawNumber\n2026-10-01,1,2,3,4,47,10,500\n';
 assert.ok(checkRow('sfl', parseUkCsv(sfl, 'sfl')[0]));
@@ -47,3 +49,18 @@ console.log('all parser tests passed');
 const kj = parseMk6Json(JSON.stringify({ code: 0, data: { list: [{ issue: '26/112', drawResult: '31,2,5,7,8,21,29', drawTime: '2026-10-20 21:30:00', code: 'hk6' }, { issue: 'x', drawResult: '1,2' }] } }));
 assert.equal(kj.length, 1); assert.deepEqual(kj[0], { date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 31], b: [29] }); assert.ok(checkRow('mk6', kj[0]));
 console.log('mk6 json parser ok');
+
+import { parseIssue, applyDraw } from './add-draw.mjs';
+const rq = parseIssue('game: mk6\ndate: 2026-10-22\ndraw: 26/113\nmain: 31 2 5 7 8 21\nbonus: 29\nforce: no\n');
+assert.deepEqual(rq, { game: 'mk6', date: '2026-10-22', draw: '26/113', m: [2, 5, 7, 8, 21, 31], b: [29], force: false });
+const base = [{ date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 29], b: [31] }];
+const now = new Date('2026-10-22T10:00:00Z');
+let r2 = applyDraw(rq, base, now); assert.ok(r2.ok && r2.rows.length === 2 && r2.rows[1].dn === '26/113');
+assert.ok(!applyDraw({ ...rq, date: '2026-12-01' }, base, now).ok, 'future date');
+assert.ok(!applyDraw({ ...rq, m: [1, 1, 2, 3, 4, 5] }, base, now).ok, 'duplicate numbers');
+assert.ok(!applyDraw({ ...rq, game: 'xx' }, base, now).ok, 'unknown game');
+assert.ok(!applyDraw({ ...rq, date: '2026-10-20' }, base, now).ok, 'existing different date needs force');
+assert.ok(applyDraw({ ...rq, date: '2026-10-20', force: true }, base, now).ok, 'force overwrites');
+assert.ok(applyDraw({ ...rq, date: '2026-10-20', m: base[0].m, b: base[0].b, draw: '' }, base, now).noChange, 'same data = no change');
+assert.ok(!applyDraw({ ...rq, draw: 'abc' }, base, now).ok, 'bad draw label');
+console.log('add-draw tests ok');

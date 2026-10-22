@@ -105,11 +105,12 @@ export function parseUkXml(text, gid) {
     const date = parseDateAny((body.match(/<draw-date>([^<]+)<\/draw-date>/i) || [])[1]);
     const dnRaw = (body.match(/<draw-number>(\d+)<\/draw-number>/i) || [])[1];
     const balls = (body.match(/<balls\b[^>]*>([\s\S]*?)<\/balls>/i) || [])[1] || '';
-    const list = [...balls.matchAll(/<ball\b[^>]*?number="(\d+)"[^>]*>\s*(\d+)\s*<\/ball>/gi)]
-      .map((m) => [parseInt(m[1], 10), parseInt(m[2], 10)]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
-    if (!date || list.length < g.mainN + g.bonusN) throw new Error(`cannot read draw from XML (date ${date}, ${list.length} balls); game block: ${JSON.stringify(body.slice(0, 1800))}`);
-    out.push({ date, dn: dnRaw ? parseInt(dnRaw, 10) : null,
-      m: list.slice(0, g.mainN).sort((x, y) => x - y), b: list.slice(g.mainN, g.mainN + g.bonusN).sort((x, y) => x - y) });
+    const grab = (re) => [...balls.matchAll(re)].map((m) => [parseInt(m[1], 10), parseInt(m[2], 10)]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+    const main = grab(/<ball\b[^>]*?number="(\d+)"[^>]*>\s*(\d+)\s*<\/ball>/gi);
+    const bonus = grab(/<bonus-ball\b[^>]*?number="(\d+)"[^>]*>\s*(\d+)\s*<\/bonus-ball>/gi);
+    const list = [...main, ...bonus];
+    if (!date || main.length !== g.mainN || bonus.length !== g.bonusN) throw new Error(`cannot read draw from XML (date ${date}, ${main.length} balls, ${bonus.length} bonus); game block: ${JSON.stringify(body.slice(0, 1800))}`);
+    out.push({ date, dn: dnRaw ? parseInt(dnRaw, 10) : null, m: main.sort((x, y) => x - y), b: bonus.sort((x, y) => x - y) });
   }
   return out;
 }
@@ -200,7 +201,7 @@ export function mergeInto(existing, fresh) {
   }
   return { rows: [...map.values()].sort(byDate), added, changed };
 }
-function serialise(gid, source, rows) {
+export function serialise(gid, source, rows) {
   const head = `{"game":${JSON.stringify(gid)},"updated":${JSON.stringify(new Date().toISOString().replace(/\.\d+Z$/, 'Z'))},"source":${JSON.stringify(source)},"rows":[\n`;
   return head + rows.map((r) => JSON.stringify([r.date, r.dn, r.m, r.b])).join(',\n') + '\n]}\n';
 }
