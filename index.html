@@ -177,6 +177,23 @@ tr:hover td{background:var(--hl)}
 .note{color:var(--muted);font-size:12.5px;margin-top:20px}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;
   max-width:92vw;display:none;font-size:13.5px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+
+/* add-draw dialog */
+#addMask{position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:16px}
+#addMask.on{display:flex}
+#addBox{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(680px,100%);margin:auto 0}
+#addBox h2{margin:0 0 8px;font-size:17px}
+#addBox .row{display:flex;gap:10px 14px;flex-wrap:wrap;margin:10px 0;align-items:end}
+#addBox label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+#addBox input[type=date],#addBox input[type=text],#addBox select{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:5px 8px;color:var(--fg);min-width:130px}
+#addBox .ng{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px;margin:6px 0 12px}
+#addBox .ng .num.sel.mm{--sc:var(--main)}
+#addBox .ng .num.sel.bb{--sc:#000}
+#addBox .ng .num.dis{opacity:.35}
+#addBox .cnt{font-weight:700;margin-top:6px}
+#addBox .cnt.ok{color:#1a9b3a}
+#addBox .hint{font-size:12px;color:var(--muted);margin:6px 0}
+#addBox .btnrow{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -187,6 +204,7 @@ tr:hover td{background:var(--hl)}
     <div class="spacer"></div>
     <button class="btn" id="btnLang"></button>
     <button class="btn primary" id="btnUpdate"></button>
+    <button class="btn" id="btnAdd"></button>
     <button class="btn" id="btnImport"></button>
     <button class="btn" id="btnClear"></button>
     <input type="file" id="file" accept=".csv,text/csv" multiple hidden>
@@ -220,6 +238,7 @@ tr:hover td{background:var(--hl)}
   <button class="fb" id="goPick"></button>
   <button class="fb" id="toTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg><span id="lblTop"></span></button>
 </nav>
+<div id="addMask"><div id="addBox" role="dialog" aria-modal="true"></div></div>
 <div id="dropMask"></div>
 <div id="toast"></div>
 
@@ -284,6 +303,7 @@ const I18N = {
   navTop:'頂部', navPick:'選號區', update:'更新資料', updating:'更新緊…', runGh:'去 GitHub 手動更新', dataUrl:'設定網站網址',
   askUrl:'請輸入你網站嘅網址（例如 https://你的用戶名.github.io/repo名/）。本機版會由呢個網站讀取最新資料：',
   updNew:'{g}：新增 {n} 期（最新 {d}）', updSame:'{g}：已經係最新', updFail:'{g}：未能更新（{e}）',
+  addBtn:'新增一期', addTitle:'手動新增一期開獎', addGame:'遊戲', addDate:'開獎日期', addDraw:'期數（可留空）', addMain:'主號', addBonus:'特別號', addSel:'已選', addForce:'覆蓋已有同日資料（只用於更正）', addSubmit:'提交到 GitHub', addCancel:'取消', addHint:'撳「提交」後會開 GitHub 嘅新 Issue 頁（內容已填好），再撳「Submit new issue」。約 1–2 分鐘後完成，之後撳「更新資料」就見到。只有 repo 擁有者提交先會被接受。', noRepo:'未能知道 GitHub repo。請先設定網站網址（https://用戶名.github.io/repo名/）',
   lastDraw:'最新一期', siteAt:'網站資料更新於', importedAt:'資料匯入於', noRemote:'未設定網站網址，未能讀取網上資料',
   imported:'已匯入 {g}：{n} 期（{a} 至 {b}）', unknown:'認唔出 {f} 係邊款遊戲，已略過', noRows:'{f} 入面冇有效資料', storeFail:'呢個瀏覽器唔支援儲存，今次資料只會留喺記憶體',
   notice:'提示：每期開獎都係獨立隨機事件，分佈圖、冷熱號同統計都唔可以預測下一期結果，只係方便睇歷史同揀號。',
@@ -319,6 +339,7 @@ const I18N = {
   navTop:'Top', navPick:'Picker', update:'Update data', updating:'Updating…', runGh:'Run update on GitHub', dataUrl:'Set site address',
   askUrl:'Enter your site address (e.g. https://your-name.github.io/repo-name/). This local copy will read the latest data from it:',
   updNew:'{g}: {n} new draws (latest {d})', updSame:'{g}: already up to date', updFail:'{g}: could not update ({e})',
+  addBtn:'Add a draw', addTitle:'Add one draw by hand', addGame:'Game', addDate:'Draw date', addDraw:'Draw no. (optional)', addMain:'Main', addBonus:'Bonus', addSel:'Selected', addForce:'Overwrite an existing draw on that date (corrections only)', addSubmit:'Submit to GitHub', addCancel:'Cancel', addHint:'This opens a pre-filled GitHub issue; press "Submit new issue". It is processed in 1–2 minutes, then press "Update data". Only the repo owner\'s submissions are accepted.', noRepo:'Cannot tell the GitHub repo. Set the site address first (https://user.github.io/repo/)',
   lastDraw:'Latest draw', siteAt:'site data updated', importedAt:'data imported', noRemote:'No site address set, cannot read online data',
   imported:'Imported {g}: {n} draws ({a} to {b})', unknown:'Could not tell which game {f} is, skipped', noRows:'No valid rows in {f}', storeFail:'This browser cannot store data; it will only be kept in memory this time',
   notice:'Note: every draw is an independent random event. Charts, hot/cold numbers and stats cannot predict the next draw; they only help you browse history and pick.',
@@ -535,6 +556,76 @@ function askBase(){
   renderTop(); return !!b;
 }
 const fmtAt=ms=>{ const d=new Date(ms), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); };
+
+
+/* =====================================================================
+   Add one draw by hand: pre-filled GitHub issue, processed by .github/workflows/add-draw.yml
+   ===================================================================== */
+function repoInfo(){
+  try{
+    const u=new URL(remoteBase()); if(!u.hostname.endsWith('.github.io')) return null;
+    const user=u.hostname.split('.')[0]; return {user,repo:u.pathname.split('/').filter(Boolean)[0]||(user+'.github.io')};
+  }catch(e){ return null; }
+}
+const A={game:'lotto',date:'',draw:'',m:new Set(),b:new Set(),force:false,drawTouched:false};
+const todayStr=()=>{ const d=new Date(), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); };
+function addPool(){
+  const g=GAMES[A.game], d=S.data[A.game], r=d&&d.rows[d.rows.length-1];
+  const mx=r?r.mx:g.mainEras[g.mainEras.length-1][1], bx=g.same?mx:(r?r.bx:g.bonusEras[g.bonusEras.length-1][1]);
+  return {mx,bx};
+}
+function suggestDraw(){
+  const d=S.data[A.game], r=d&&d.rows[d.rows.length-1]; if(!r||r.dn==null) return '';
+  if(typeof r.dn==='number') return String(r.dn+1);
+  const m=String(r.dn).match(/^(\d\d)\/(\d+)$/); if(!m) return '';
+  const yy=(A.date||todayStr()).slice(2,4);
+  return yy+'/'+(yy===m[1]?(+m[2]+1):1);
+}
+function renderAdd(){
+  const g=GAMES[A.game], {mx,bx}=addPool(), L=S.lang;
+  const grid=(set,max,cls,pool)=>{ let h='<div class="ng">'; for(let n=1;n<=max;n++){ const sel=set.has(n), other=g.same&&(pool==='m'?A.b.has(n):A.m.has(n)); h+=`<button type="button" class="num ${cls} ${sel?'sel':''} ${other?'dis':''}" data-p="${pool}" data-n="${n}">${n}</button>`; } return h+'</div>'; };
+  const okM=A.m.size===g.mainN, okB=A.b.size===g.bonusN;
+  $('#addBox').innerHTML=`<h2>${T('addTitle')}</h2>
+  <div class="row">
+    <label class="f">${T('addGame')}<select id="adG">${ORDER.map(id=>`<option value="${id}" ${id===A.game?'selected':''}>${esc(gname(GAMES[id]))}</option>`).join('')}</select></label>
+    <label class="f">${T('addDate')}<input type="date" id="adD" value="${A.date}"></label>
+    <label class="f">${T('addDraw')}<input type="text" id="adN" value="${esc(A.draw)}" placeholder="${esc(suggestDraw())}" inputmode="text" size="10"></label>
+  </div>
+  <div class="cnt ${okM?'ok':''}">${g.mName[L]} 1–${mx}　${T('addSel')} ${A.m.size}/${g.mainN}</div>${grid(A.m,mx,'mm','m')}
+  <div class="cnt ${okB?'ok':''}">${g.bName[L]} 1–${bx}　${T('addSel')} ${A.b.size}/${g.bonusN}</div>${grid(A.b,bx,'bb','b')}
+  <label class="chk"><input type="checkbox" id="adF" ${A.force?'checked':''}> ${T('addForce')}</label>
+  <p class="hint">${T('addHint')}</p>
+  <div class="btnrow"><button class="btn" id="adCancel">${T('addCancel')}</button><button class="btn primary" id="adSubmit" ${okM&&okB&&A.date?'':'disabled'}>${T('addSubmit')}</button></div>`;
+}
+function openAdd(){
+  if(!repoInfo()){ if(isLocalFile()&&askBase()&&repoInfo()){} else { toast(T('noRepo'),6000); return; } }
+  A.game=GAMES[S.game]?S.game:'lotto'; A.date=todayStr(); A.m.clear(); A.b.clear(); A.force=false; A.draw=''; 
+  A.draw=suggestDraw(); renderAdd(); $('#addMask').classList.add('on');
+}
+function closeAdd(){ $('#addMask').classList.remove('on'); }
+function submitAdd(){
+  const g=GAMES[A.game], ri=repoInfo(); if(!ri) return;
+  const body=['game: '+A.game,'date: '+A.date,'draw: '+(A.draw||'').trim(),'main: '+[...A.m].sort((x,y)=>x-y).join(' '),'bonus: '+[...A.b].sort((x,y)=>x-y).join(' '),'force: '+(A.force?'yes':'no')].join('\n');
+  const url='https://github.com/'+ri.user+'/'+ri.repo+'/issues/new?title='+encodeURIComponent('[add-draw] '+A.game+' '+A.date)+'&body='+encodeURIComponent(body);
+  window.open(url,'_blank','noopener'); closeAdd();
+}
+$('#btnAdd').addEventListener('click',openAdd);
+$('#addMask').addEventListener('click',e=>{
+  if(e.target.id==='addMask'||e.target.id==='adCancel'){ closeAdd(); return; }
+  if(e.target.id==='adSubmit'){ submitAdd(); return; }
+  const n=e.target.closest('.num'); if(!n) return;
+  const g=GAMES[A.game], v=+n.dataset.n, set=n.dataset.p==='m'?A.m:A.b, other=n.dataset.p==='m'?A.b:A.m, cap=n.dataset.p==='m'?g.mainN:g.bonusN;
+  if(set.has(v)) set.delete(v); else if(!(g.same&&other.has(v))&&set.size<cap) set.add(v);
+  renderAdd();
+});
+$('#addMask').addEventListener('change',e=>{
+  if(e.target.id==='adG'){ A.game=e.target.value; A.m.clear(); A.b.clear(); A.draw=suggestDraw(); renderAdd(); }
+  else if(e.target.id==='adD'){ A.date=e.target.value; A.draw=suggestDraw(); renderAdd(); }
+  else if(e.target.id==='adN'){ A.draw=e.target.value; }
+  else if(e.target.id==='adF'){ A.force=e.target.checked; }
+});
+$('#addMask').addEventListener('input',e=>{ if(e.target.id==='adN') A.draw=e.target.value; });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAdd(); });
 
 async function importFiles(files){
   const msgs=[]; let firstOK=null; let storeFail=false; const importedIds=[];
@@ -947,7 +1038,8 @@ function renderTop(){
   $('#goPick').textContent=T('navPick');
   $('#goBonus').textContent=G().bName[S.lang]; $('#goBonus').hidden=!V||G().same;
   $('#fab').classList.toggle('show',!!V);
-  $('#btnUpdate').textContent=updating?T('updating'):T('update');
+  $('#btnUpdate').textContent=updating?T('updating'):T('update'); $('#btnAdd').textContent=T('addBtn');
+  if($('#addMask').classList.contains('on')) renderAdd();
   const d0=S.data[S.game], last=d0&&d0.rows[d0.rows.length-1];
   $('#dataText').textContent=last?(T('lastDraw')+' '+last.date+(last.dn!=null?'（'+last.dn+'）':'')+' · '+(d0.rat?T('siteAt')+' '+fmtAt(d0.rat):T('importedAt')+' '+fmtAt(d0.at))):'';
   const run=actionsUrl(); $('#lnkRun').hidden=!run; if(run){ $('#lnkRun').href=run; $('#lnkRun').textContent=T('runGh'); }
