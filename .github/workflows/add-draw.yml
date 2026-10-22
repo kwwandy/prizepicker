@@ -69,7 +69,7 @@ jobs:
         if: steps.add.outcome == 'success'
         run: |
           mkdir _site
-          cp index.html _site/
+          cp index.html manifest.webmanifest favicon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
           cp -r data _site/data
           touch _site/.nojekyll
 
