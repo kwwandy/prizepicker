@@ -29,8 +29,8 @@ export const GAMES = {
   mk6:   { mainN: 6, bonusN: 1, maxMain: 49, maxBonus: 49, minRows: 500 },
 };
 /* run day (UTC weekday) -> games drawn the day before.
-   Lotto Wed+Sat, Set for Life Mon+Thu, EuroMillions Tue+Fri, Powerball Mon+Wed+Sat, Mark Six Tue+Thu+Sat, Thunderball Tue+Wed+Fri+Sat. Monday is not scheduled. */
-export const AUTO = { 0: ['lotto', 'pb', 'tb', 'mk6'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'tb', 'mk6'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl', 'mk6'], 6: ['euro', 'tb'] };
+   Lotto Wed+Sat, Set for Life Mon+Thu, EuroMillions Tue+Fri, Powerball Mon+Wed+Sat, Mark Six (manual only), Thunderball Tue+Wed+Fri+Sat. Monday is not scheduled. */
+export const AUTO = { 0: ['lotto', 'pb', 'tb'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'tb'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl'], 6: ['euro', 'tb'] };
 
 /* ---------------------------------------------------------------- helpers */
 export function parseCSV(text) {
@@ -262,7 +262,7 @@ async function main() {
   let sel = String(opt('games') === true || opt('games') == null ? 'auto' : opt('games')).trim();
   let games;
   if (sel === 'auto') games = AUTO[new Date().getUTCDay()];
-  else if (sel === 'all') games = Object.keys(GAMES);
+  else if (sel === 'all') games = Object.keys(GAMES).filter((g) => g !== 'mk6'); /* mk6: no source reachable from GitHub; add draws by hand, or run --games mk6 explicitly */
   else games = sel.split(',').map((x) => x.trim()).filter(Boolean);
   const bad = games.filter((g) => !GAMES[g]); if (bad.length) { console.error('unknown game: ' + bad.join(', ')); process.exit(1); }
   console.log(`games to update (${sel}): ${games.join(', ') || 'none'}`);
