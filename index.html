@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>開獎分佈圖 · Draw Charts</title>
+<style>
+:root{
+  --bg:#eef0f4; --panel:#ffffff; --fg:#1b2230; --muted:#667085; --line:#d5dae3; --soft:#f5f6f9;
+  --accent:#2d6ae6; --accent-fg:#fff;
+  --main:#dc4b3e; --main-fg:#fff; --bonus:#12151a; --bonus-fg:#fff;
+  --grid:#9fb4dd; --sep:#e0221b; --hl:rgba(255,196,0,.30); --pin:#f8f29a; --na:#dfe3ea;
+  --bonus-zone:rgba(60,90,200,.07); --bar-count:#6a1010; --bar-gap:#1c7d2d; --red-text:#d11a1a;
+  --pick:rgba(45,106,230,.13); --hot:#d94a3b; --cold:#2d6ae6; --head:#f0f2f7;
+  --font:"PingFang HK","PingFang TC","Microsoft JhengHei","Noto Sans CJK TC","Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0e1014; --panel:#171a20; --fg:#e7eaf0; --muted:#97a1b3; --line:#2b313c; --soft:#1d2129;
+    --accent:#5b93ff; --main:#e2574a; --bonus:#f1f2f4; --bonus-fg:#111;
+    --grid:#2d3b5c; --sep:#ff4b43; --hl:rgba(255,205,40,.22); --pin:#4b4820; --na:#252a33;
+    --bonus-zone:rgba(110,140,255,.08); --bar-count:#cf4a40; --bar-gap:#3fbf55; --red-text:#ff6e65;
+    --pick:rgba(91,147,255,.2); --head:#1d2129;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font);-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:2200px;margin:0 auto;padding:0 16px 40px}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:12px 0 8px}
+.top h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.02em}
+.games{display:flex;gap:4px;flex-wrap:wrap}
+.games button{border:1px solid var(--line);background:var(--panel);padding:5px 12px;border-radius:6px;font-weight:600}
+.games button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.games button.nodata{opacity:.55;font-weight:500}
+.games small{font-weight:400;opacity:.75;margin-left:4px}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel);padding:5px 12px;border-radius:6px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.small{padding:2px 8px;font-size:12px}
+
+/* controls */
+.ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:6px 0 10px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.chips button{border:1px solid var(--line);background:var(--panel);padding:3px 10px;border-radius:999px;min-width:40px}
+.chips button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.chips input{width:64px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.lbl{color:var(--muted);font-size:13px}
+.ctrl input[type=range]{width:110px;vertical-align:middle}
+.legend{display:flex;gap:12px;align-items:center;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.sw.m{background:var(--main)} .sw.b{background:var(--bonus);border:1px solid var(--line)} .sw.n{background:var(--na)}
+.sw.p{background:var(--pin);border:1px solid var(--line)}
+@media (max-height:520px){
+  .fb{height:32px;padding:0 11px;font-size:12px} #fab{gap:6px}
+  .datainfo{padding-bottom:4px;font-size:12px}
+  .top{padding:6px 0 4px;gap:6px 10px} .top h1{display:none}
+  .games button,.btn{padding:3px 9px;font-size:13px}
+  .ctrl{padding:2px 0 6px;gap:4px 10px} .legend{display:none}
+  .chips button{padding:1px 8px;min-width:34px} .chips input{width:72px;padding:1px 6px}
+  .wrap{padding:0 10px 30px}
+}
+label.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+
+/* chart: one table per pool, page-level scrolling (horizontal scroll only when a table is wider than the screen) */
+#charts{display:block}
+.blk{margin-bottom:18px}
+.blkTitle{font-size:15px;margin:6px 0 6px;font-weight:700}
+.blkScroll{overflow-x:auto;overflow-y:hidden;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.blkSizer{position:relative}
+.cv{display:block;position:sticky;left:0}
+#tip{position:absolute;z-index:30;background:var(--fg);color:var(--bg);padding:9px 34px 9px 12px;border-radius:8px;
+  font-size:13px;line-height:1.6;max-width:320px;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+#tip .h.sep{margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,.45)}
+#tip .nums span{display:inline-block;min-width:22px;text-align:center;border-radius:3px;padding:0 3px;margin:1px 2px 0 0;font-weight:700}
+#tip .nums .m{background:var(--main);color:#fff}
+#tip .nums .b{background:#000;color:#fff;outline:1px solid #888}
+#tip .x{position:absolute;top:4px;right:4px;width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:20px;line-height:1}
+#tip .x:hover{background:rgba(128,128,128,.3)}
+#empty{display:none;text-align:center;padding:48px 16px;border:1px dashed var(--line);border-radius:8px;background:var(--panel)}
+#empty .inner{max-width:480px;margin:0 auto}
+#empty h2{margin:0 0 8px;font-size:18px}
+#empty p{margin:6px 0;color:var(--muted)}
+#dropMask{position:fixed;inset:0;z-index:50;background:rgba(45,106,230,.18);border:4px dashed var(--accent);display:none;
+  align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--accent);backdrop-filter:blur(2px)}
+#fab{position:fixed;right:calc(14px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));z-index:40;display:none;
+  flex-direction:column;align-items:flex-end;gap:8px}
+#fab.show{display:flex}
+.fb{height:38px;padding:0 14px;border-radius:19px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:13px;
+  display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.fb:hover{border-color:var(--accent);color:var(--accent)}
+.fb[hidden]{display:none}
+#toTop{display:none}
+#toTop.show{display:inline-flex}
+.fb svg{width:16px;height:16px;flex:none}
+.datainfo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:0 0 8px;font-size:13px;color:var(--muted)}
+.datainfo a.btn{text-decoration:none;color:inherit}
+.datainfo a.btn[hidden],.datainfo .btn[hidden]{display:none}
+
+/* bottom panels */
+.tabs{display:flex;gap:2px;margin-top:16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:8px 16px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+.panel{display:none;padding:16px 0}
+.panel.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+h3{font-size:14px;margin:0 0 8px}
+
+/* picker */
+.pk{display:grid;grid-template-columns:minmax(300px,1.15fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.pk{grid-template-columns:1fr}}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:4px 12px}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.pk-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px;margin:6px 0 14px}
+.num{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:6px;height:38px;font-weight:600;font-variant-numeric:tabular-nums;padding:0}
+.num:hover{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.num.sel{background:var(--sc,var(--accent));color:#fff;border-color:var(--sc,var(--accent))}
+.num .dot{position:absolute;bottom:3px;width:5px;height:5px;border-radius:50%}
+#setSeg button{color:var(--sc);font-weight:700;min-width:36px}
+#setSeg button.on{background:var(--sc);color:#fff}
+.srow{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;border:1px solid transparent;cursor:pointer;flex-wrap:wrap}
+.srow.act{border-color:var(--line);background:var(--panel)}
+.srow .sl{flex:none;width:22px;height:22px;border-radius:5px;color:#fff;text-align:center;line-height:22px;font-size:13px}
+.srow .sb{flex:1;min-width:140px}
+.srow .sbtn{display:inline-flex;gap:4px}
+.num.must::after{content:"★";position:absolute;top:0;right:3px;font-size:10px;color:#1a9b3a}
+.num.sel.must::after{color:#9dffb5}
+.num.excl{color:var(--muted);text-decoration:line-through;background:repeating-linear-gradient(135deg,transparent 0 5px,var(--na) 5px 6px)}
+.pk-summary{padding:10px 12px;background:var(--soft);border-radius:8px;margin-bottom:10px;font-size:13px}
+.ball{display:inline-block;min-width:26px;text-align:center;border-radius:13px;padding:1px 6px;margin:1px 2px 1px 0;font-weight:700;
+  background:var(--main);color:#fff;font-variant-numeric:tabular-nums}
+.ball.b{background:var(--bonus);color:var(--bonus-fg);outline:1px solid var(--line)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.opt{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:10px 0}
+.opt select,.opt input[type=number]{padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);max-width:100%}
+.opt input[type=number]{width:70px}
+.tk{border-top:1px solid var(--line);padding:10px 0}
+.tk:first-child{border-top:0}
+.tk .meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+.chip{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:0 8px;margin:2px 4px 0 0;font-size:12px}
+.chip.hit{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.err{color:var(--red-text);margin:6px 0;font-size:13px}
+
+/* stats */
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{background:var(--head);cursor:pointer;user-select:none;font-weight:600}
+th:first-child,td:first-child{text-align:center}
+th.sorted::after{content:attr(data-arrow);margin-left:4px;color:var(--accent)}
+tr:hover td{background:var(--hl)}
+.barcell{position:relative;min-width:110px}
+.barcell i{position:absolute;left:0;top:3px;bottom:3px;background:var(--pick);border-radius:2px}
+.barcell span{position:relative}
+.tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:12px;color:#fff}
+.tag.hot{background:var(--hot)} .tag.cold{background:var(--cold)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:12.5px}
+.dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.hb{display:grid;grid-template-columns:70px 1fr 78px;gap:6px;align-items:center;font-size:12.5px;margin:3px 0}
+.hb .t{background:var(--soft);border-radius:3px;height:14px;overflow:hidden}
+.hb .t i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.hb .v{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.pair{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 10px;cursor:pointer;text-align:left}
+.pair:hover{border-color:var(--accent)}
+.note{color:var(--muted);font-size:12.5px;margin-top:20px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;
+  max-width:92vw;display:none;font-size:13.5px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1 id="ttl"></h1>
+    <div class="games" id="games"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnLang"></button>
+    <button class="btn primary" id="btnUpdate"></button>
+    <button class="btn" id="btnImport"></button>
+    <button class="btn" id="btnClear"></button>
+    <input type="file" id="file" accept=".csv,text/csv" multiple hidden>
+  </div>
+
+  <div class="ctrl">
+    <div class="chips" id="periods"></div>
+    <label class="lbl"><span id="lblZoom"></span> <input type="range" id="zoom" min="12" max="44" step="1"></label>
+    <button class="btn small" id="btnFit"></button>
+    <label class="chk" id="incWrap"><input type="checkbox" id="incBonus"><span id="lblInc"></span></label>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="datainfo" id="dataInfo"><span id="dataText"></span>
+    <a class="btn small" id="lnkRun" target="_blank" rel="noopener" hidden></a>
+    <button class="btn small" id="btnUrl" hidden></button></div>
+
+  <div id="charts"></div>
+  <div id="empty"><div class="inner"></div></div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="panel" id="p-pick"></div>
+  <div class="panel" id="p-nums"></div>
+  <div class="panel" id="p-dist"></div>
+  <div class="panel" id="p-pairs"></div>
+  <p class="note" id="note"></p>
+</div>
+<div id="tip" role="dialog"></div>
+<nav id="fab">
+  <button class="fb" id="goBonus" hidden></button>
+  <button class="fb" id="goPick"></button>
+  <button class="fb" id="toTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg><span id="lblTop"></span></button>
+</nav>
+<div id="dropMask"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Config
+   ===================================================================== */
+const GAMES = {
+  lotto:{ id:'lotto', zh:'Lotto', en:'UK Lotto', sub:{zh:'英國',en:''}, mainN:6, bonusN:1, same:true,
+    detect:'Bonus Number', mainEras:[['2000-01-01',49],['2015-10-10',59]], pickMain:6, pickBonus:0,
+    bName:{zh:'特別號',en:'Bonus'}, mName:{zh:'主號',en:'Main'} },
+  sfl:{ id:'sfl', zh:'Set for Life', en:'Set for Life', sub:{zh:'英國',en:'UK'}, mainN:5, bonusN:1, same:false,
+    detect:'Life Ball', mainEras:[['2000-01-01',47]], bonusEras:[['2000-01-01',10]], pickMain:5, pickBonus:1,
+    bName:{zh:'生命球',en:'Life Ball'}, mName:{zh:'主號',en:'Main'} },
+  tb:{ id:'tb', zh:'Thunderball', en:'Thunderball', sub:{zh:'英國',en:'UK'}, mainN:5, bonusN:1, same:false,
+    detect:'Thunderball', mainEras:[['1999-01-01',34],['2010-05-12',39]], bonusEras:[['1999-01-01',14]], pickMain:5, pickBonus:1,
+    bName:{zh:'Thunderball',en:'Thunderball'}, mName:{zh:'主號',en:'Main'} },
+  euro:{ id:'euro', zh:'EuroMillions', en:'EuroMillions', sub:{zh:'歐洲',en:''}, mainN:5, bonusN:2, same:false,
+    detect:'Lucky Star 1', mainEras:[['2000-01-01',50]], bonusEras:[['2000-01-01',9],['2011-05-10',11],['2016-09-24',12]],
+    pickMain:5, pickBonus:2, bName:{zh:'幸運星',en:'Lucky Stars'}, mName:{zh:'主號',en:'Main'} },
+  pb:{ id:'pb', zh:'Powerball', en:'Powerball', sub:{zh:'美國',en:'USA'}, mainN:5, bonusN:1, same:false,
+    detect:'Powerball', mainEras:[['2000-01-01',55],['2009-01-04',59],['2015-10-07',69]],
+    bonusEras:[['2000-01-01',42],['2009-01-04',39],['2012-01-15',35],['2015-10-07',26]], pickMain:5, pickBonus:1,
+    bName:{zh:'強力球',en:'Powerball'}, mName:{zh:'主號',en:'Main'} },
+  mk6:{ id:'mk6', zh:'六合彩', en:'Mark Six', sub:{zh:'香港',en:'Hong Kong'}, mainN:6, bonusN:1, same:true,
+    detect:'extra_ball', mainEras:[['1993-01-01',49]], pickMain:6, pickBonus:0,
+    bName:{zh:'特別號',en:'Extra'}, mName:{zh:'主號',en:'Main'} }
+};
+GAMES.lotto.bonusEras = GAMES.lotto.mainEras;
+GAMES.mk6.bonusEras = GAMES.mk6.mainEras;
+const ORDER = ['lotto','sfl','tb','euro','pb','mk6'];
+
+const I18N = {
+ zh:{
+  title:'開獎分佈圖 + 選號器', import:'匯入 CSV', clear:'清除已存資料',
+  clearAsk:'確定清除所有已儲存嘅開獎資料同選號清單？', cleared:'已清除所有資料',
+  emptyTitle:'未有 {g} 嘅資料', emptyBody:'將 CSV 檔拖放到呢度，或者撳「匯入 CSV」。可以一次揀多個檔案，App 會自動認出係邊款遊戲。',
+  privacy:'資料只會留喺你部機嘅瀏覽器，唔會上傳去任何伺服器。',
+  all:'全部', perN:'期', custom:'自訂期數', zoom:'格仔大細', fit:'適應寬度',
+  incBonus:'統計包含特別號', lm:'主號', lb:'特別號', ln:'當時未有', lp:'標記行',
+  cnt:'開出次數', gapNow:'距今未開', gapMax:'最大遺漏', pickRow:'選號',
+  tabPick:'選號區', tabNums:'號碼統計', tabDist:'整體分佈', tabPairs:'配對',
+  modePick:'揀號', modeMust:'必選', modeExcl:'排除', heat:'顯示冷熱',
+  selected:'已揀', none:'未揀', combos:'共可組成 {c} 注', needMore:'仲差 {n} 個先夠一注', rule:'規則：主號 {k} 個',
+  ruleB:'，{b} {kb} 個', clearPick:'清除選號', saveTicket:'儲存做一注', noPickSave:'未揀號碼，唔可以儲存',
+  random:'機選（跟規則）', rndOne:'機選一注（填入選號）', rndMany:'機選 {n} 注（加入清單）',
+  parity:'單雙比例', size:'大細比例', sum:'和值範圍', hot:'熱號至少', cold:'冷號至少', consec:'連號', any:'不限',
+  avoid:'避免連號', atleast:'至少一對連號', histRange:'用歷史常見範圍', odd:'單', even:'雙', lowW:'細', highW:'大',
+  tickets:'選號清單', noTickets:'暫時冇儲存嘅選號。喺上面揀好號碼，撳「儲存做一注」。', load:'載入', del:'刪除', copyAll:'複製全部', copied:'已複製到剪貼簿',
+  histTitle:'歷史檢查', hitDist:'主號同中', never:'歷史上未有同中 {k} 個主號', bestHit:'最高同中', times:'期', last:'最近',
+  errMust:'必選號多過 {k} 個', errMustExcl:'有號碼同時設為必選同排除', errPool:'排除咗太多號碼，唔夠揀', errHC:'熱號加冷號個數超過 {k}',
+  errNeedData:'冷熱條件需要先匯入資料', errCond:'條件太嚴，搵唔到組合，放寬一下啦', errBonusPool:'{b} 可揀範圍唔夠',
+  mustHint:'「必選」只係畀機選用',
+  num:'號碼', freq:'頻率', avgGap:'平均遺漏', lastSeen:'最近開出', tag:'冷熱', hotT:'熱', coldT:'冷',
+  poolMain:'主號', draws:'期數', range:'日期範圍', avgSum:'平均和值', avgOdd:'平均單數', avgHigh:'平均大號數', avgRep:'平均與上期重複', consecRate:'有連號嘅期數',
+  oddEven:'單雙分佈（單:雙）', lowHigh:'大細分佈（細:大）', zones:'每十個號碼區間（平均每期）', sumDist:'和值分佈', repDist:'與上期重複個數', consecDist:'連號對數',
+  pairsTitle:'最常同時開出嘅號碼配對（主號）', pairHint:'撳一下可以將兩個號碼加入選號', pairTimes:'{n} 次',
+  tipDraw:'第 {n} 期', tipMain:'主號', tipNum:'號碼 {n}', tipStat:'開出 {c} 次（{f}%）· 距今未開 {g} · 平均遺漏 {a} · 最大遺漏 {m}',
+  tipLast:'最近開出：{d}', tipNever:'呢段期間未開過', tipNA:'當時未有呢個號碼', tipHit:'今期開出', tipPick:'撳一下加入／移除選號', tipPin:'撳一下標記呢一行',
+  close:'關閉', editing:'目前編輯', clearAll:'清除全部選號', clr1:'清除', save1:'儲存', rndFour:'機選四組（填入 A–D）', addedTo:'已加入 {s} 組', toTop:'返回頂部',
+  navTop:'頂部', navPick:'選號區', update:'更新資料', updating:'更新緊…', runGh:'去 GitHub 手動更新', dataUrl:'設定網站網址',
+  askUrl:'請輸入你網站嘅網址（例如 https://你的用戶名.github.io/repo名/）。本機版會由呢個網站讀取最新資料：',
+  updNew:'{g}：新增 {n} 期（最新 {d}）', updSame:'{g}：已經係最新', updFail:'{g}：未能更新（{e}）',
+  lastDraw:'最新一期', siteAt:'網站資料更新於', importedAt:'資料匯入於', noRemote:'未設定網站網址，未能讀取網上資料',
+  imported:'已匯入 {g}：{n} 期（{a} 至 {b}）', unknown:'認唔出 {f} 係邊款遊戲，已略過', noRows:'{f} 入面冇有效資料', storeFail:'呢個瀏覽器唔支援儲存，今次資料只會留喺記憶體',
+  notice:'提示：每期開獎都係獨立隨機事件，分佈圖、冷熱號同統計都唔可以預測下一期結果，只係方便睇歷史同揀號。',
+  gapFloor:'≥{n}', wd:['日','一','二','三','四','五','六'], wdp:'星期',
+ },
+ en:{
+  title:'Draw Charts + Picker', import:'Import CSV', clear:'Clear saved data',
+  clearAsk:'Clear all saved draw data and saved lines?', cleared:'All data cleared',
+  emptyTitle:'No data for {g} yet', emptyBody:'Drop a CSV file here, or press "Import CSV". You can pick several files at once; the game is detected automatically.',
+  privacy:'Your data stays in this browser. Nothing is uploaded.',
+  all:'All', perN:'draws', custom:'Custom', zoom:'Cell size', fit:'Fit width',
+  incBonus:'Include bonus in stats', lm:'Main', lb:'Bonus', ln:'Not in play', lp:'Marked row',
+  cnt:'Times drawn', gapNow:'Draws since', gapMax:'Longest gap', pickRow:'Pick',
+  tabPick:'Picker', tabNums:'Number stats', tabDist:'Overall', tabPairs:'Pairs',
+  modePick:'Pick', modeMust:'Must', modeExcl:'Exclude', heat:'Show hot/cold',
+  selected:'Picked', none:'none', combos:'{c} lines possible', needMore:'{n} more for one line', rule:'Rule: {k} main numbers',
+  ruleB:', {kb} × {b}', clearPick:'Clear picks', saveTicket:'Save as a line', noPickSave:'Nothing picked yet',
+  random:'Quick pick (follows rules)', rndOne:'Quick pick one (fill picker)', rndMany:'Quick pick {n} (add to list)',
+  parity:'Odd/even', size:'Low/high', sum:'Sum range', hot:'Hot at least', cold:'Cold at least', consec:'Consecutive', any:'Any',
+  avoid:'Avoid consecutive', atleast:'At least one pair', histRange:'Use typical range', odd:'odd', even:'even', lowW:'low', highW:'high',
+  tickets:'Saved lines', noTickets:'No saved lines yet. Pick numbers above and press "Save as a line".', load:'Load', del:'Delete', copyAll:'Copy all', copied:'Copied to clipboard',
+  histTitle:'History check', hitDist:'Main matches', never:'Never matched {k} main numbers', bestHit:'Best match', times:'draws', last:'latest',
+  errMust:'More than {k} must-have numbers', errMustExcl:'A number is both must-have and excluded', errPool:'Too many numbers excluded', errHC:'Hot + cold exceeds {k}',
+  errNeedData:'Hot/cold needs imported data', errCond:'Conditions too strict, no combination found. Loosen them.', errBonusPool:'Not enough {b} numbers to choose from',
+  mustHint:'"Must" only affects quick pick',
+  num:'No.', freq:'Freq', avgGap:'Avg gap', lastSeen:'Last drawn', tag:'Hot/cold', hotT:'Hot', coldT:'Cold',
+  poolMain:'Main', draws:'Draws', range:'Date range', avgSum:'Avg sum', avgOdd:'Avg odd count', avgHigh:'Avg high count', avgRep:'Avg repeats from previous', consecRate:'Draws with consecutive',
+  oddEven:'Odd : even', lowHigh:'Low : high', zones:'Per ten-number zone (avg per draw)', sumDist:'Sum distribution', repDist:'Repeats from previous draw', consecDist:'Consecutive pairs',
+  pairsTitle:'Most frequent pairs drawn together (main)', pairHint:'Click to add both numbers to your picks', pairTimes:'{n}×',
+  tipDraw:'Draw {n}', tipMain:'Main', tipNum:'Number {n}', tipStat:'Drawn {c}× ({f}%) · since {g} · avg gap {a} · longest gap {m}',
+  tipLast:'Last drawn: {d}', tipNever:'Not drawn in this range', tipNA:'Number not in play then', tipHit:'Drawn this time', tipPick:'Click to add/remove pick', tipPin:'Click to mark this row',
+  close:'Close', editing:'Editing', clearAll:'Clear all picks', clr1:'Clear', save1:'Save', rndFour:'Quick pick all four (A–D)', addedTo:'Added to set {s}', toTop:'Back to top',
+  navTop:'Top', navPick:'Picker', update:'Update data', updating:'Updating…', runGh:'Run update on GitHub', dataUrl:'Set site address',
+  askUrl:'Enter your site address (e.g. https://your-name.github.io/repo-name/). This local copy will read the latest data from it:',
+  updNew:'{g}: {n} new draws (latest {d})', updSame:'{g}: already up to date', updFail:'{g}: could not update ({e})',
+  lastDraw:'Latest draw', siteAt:'site data updated', importedAt:'data imported', noRemote:'No site address set, cannot read online data',
+  imported:'Imported {g}: {n} draws ({a} to {b})', unknown:'Could not tell which game {f} is, skipped', noRows:'No valid rows in {f}', storeFail:'This browser cannot store data; it will only be kept in memory this time',
+  notice:'Note: every draw is an independent random event. Charts, hot/cold numbers and stats cannot predict the next draw; they only help you browse history and pick.',
+  gapFloor:'≥{n}', wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], wdp:'',
+ }
+};
+
+/* =====================================================================
+   State & helpers
+   ===================================================================== */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const pad = n=>String(n).padStart(2,'0');
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S = { game:'lotto', lang:'zh', period:30, cell:'fit', incBonus:false, tab:'pick', heat:true, mode:'pick',
+  data:{}, pick:{}, tickets:{}, pinned:new Set(), hover:null, ext:[], sort:{key:'n',dir:1}, statPool:'m', persisted:true,
+  rnd:{parity:'',size:'',smin:'',smax:'',hot:0,cold:0,consec:'',qty:5} };
+let V = null;          // computed view of current window
+let L = null;          // layout geometry
+const G = ()=>GAMES[S.game];
+const T = (k,v)=>{ let s=(I18N[S.lang][k] ?? I18N.zh[k] ?? k); if(v) for(const x in v) s=s.split('{'+x+'}').join(v[x]); return s; };
+const gname = g=> S.lang==='zh' ? (g.sub.zh? g.sub.zh+' ':'')+g.zh : (g.sub.en? g.en+(g.en.includes(g.sub.en)?'':' ('+g.sub.en+')'):g.en);
+function mkPick(){ return {sets:[0,1,2,3].map(()=>({m:new Set(),b:new Set()})),active:0,mm:new Set(),mb:new Set(),xm:new Set(),xb:new Set()}; }
+function P(){ return S.pick[S.game] ||= mkPick(); }
+function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function saveSettings(){ lsSet('dc.settings',{lang:S.lang,game:S.game,period:S.period,cell:S.cell,incBonus:S.incBonus,tab:S.tab,heat:S.heat,rnd:S.rnd}); }
+function saveTickets(){ lsSet('dc.tickets',S.tickets); }
+function toast(msg,ms=3800){ const el=$('#toast'); el.textContent=msg; el.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>el.style.display='none',ms); }
+function weekday(d){ const w=new Date(d+'T00:00:00Z').getUTCDay(); const x=I18N[S.lang]; return x.wdp+x.wd[w]; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function comb(n,k){ if(k<0||k>n) return 0; let r=1; for(let i=1;i<=k;i++) r=r*(n-k+i)/i; return Math.round(r); }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+/* =====================================================================
+   CSV parsing & data preparation
+   ===================================================================== */
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(f); f=''; if(row.length>1||row[0]!=='') rows.push(row); row=[]; }
+    else f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+function detectGame(header){
+  const h=header.map(x=>x.trim().toLowerCase());
+  if(h.includes('ball_1')&&h.includes('extra_ball')) return 'mk6';
+  if(h.includes('bonus number')) return 'lotto';
+  if(h.includes('lucky star 1')) return 'euro';
+  if(h.includes('life ball')) return 'sfl';
+  if(h.includes('thunderball')) return 'tb';
+  if(h.includes('powerball')) return 'pb';
+  return null;
+}
+function normDate(s){
+  s=(s||'').trim(); let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1]+'-'+m[2]+'-'+m[3];
+  if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return m[3]+'-'+pad(m[2])+'-'+pad(m[1]);
+  return null;
+}
+/* Hong Kong Mark Six CSV (ball_1..ball_6, extra_ball, draw_date, draw_year, draw_number_in_year) */
+function buildRowsMk6(g,table){
+  const h=table[0].map(x=>x.trim().toLowerCase()), ix=n=>h.indexOf(n);
+  const cd=ix('draw_date'), cb=[1,2,3,4,5,6].map(i=>ix('ball_'+i)), cx=ix('extra_ball'), cy=ix('draw_year'), cn=ix('draw_number_in_year'), cr=ix('has_results');
+  const out=[], seen=new Set();
+  if(cd<0||cx<0||cb.some(i=>i<0)) return out;
+  for(let i=1;i<table.length;i++){
+    const r=table[i];
+    if(cr>=0&&!/^(1|true|t|yes)$/i.test((r[cr]||'').trim())) continue;
+    const date=normDate(r[cd]); if(!date) continue;
+    const m=cb.map(c=>parseInt(r[c],10)), b=[parseInt(r[cx],10)];
+    if(m.concat(b).some(v=>!(v>=1))) continue;
+    m.sort((x,y)=>x-y);
+    if(seen.has(date)) continue; seen.add(date);
+    const yy=parseInt(r[cy],10), nn=parseInt(r[cn],10);
+    out.push({date,dn:(yy>0&&nn>0)?String(yy%100).padStart(2,'0')+'/'+nn:null,m,b});
+  }
+  out.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  return out;
+}
+function buildRows(g,table){
+  if(g.id==='mk6') return buildRowsMk6(g,table);
+  const h=table[0].map(x=>x.trim());
+  let c0=h.indexOf('Winning Number 1'); if(c0<0) c0=2;
+  let cd=h.indexOf('Date'); if(cd<0) cd=1;
+  const cn=h.indexOf('Draw');
+  const out=[], seen=new Set();
+  for(let i=1;i<table.length;i++){
+    const r=table[i]; if(r.length<c0+g.mainN+g.bonusN) continue;
+    const date=normDate(r[cd]); if(!date) continue;
+    const m=[],b=[]; let ok=true;
+    for(let k=0;k<g.mainN;k++){ const v=parseInt(r[c0+k],10); if(!(v>=1)){ ok=false; break; } m.push(v); }
+    for(let k=0;k<g.bonusN&&ok;k++){ const v=parseInt(r[c0+g.mainN+k],10); if(!(v>=1)){ ok=false; break; } b.push(v); }
+    if(!ok) continue;
+    m.sort((x,y)=>x-y); b.sort((x,y)=>x-y);
+    const key=date+'|'+m.join(',')+'|'+b.join(',');
+    if(seen.has(key)) continue; seen.add(key);
+    const dn=(cn>=0&&/^\d+$/.test((r[cn]||'').trim()))?parseInt(r[cn],10):null;
+    out.push({date,dn,m,b});
+  }
+  out.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  return out;
+}
+function eraIdx(eras,date){ let k=0; for(let i=0;i<eras.length;i++) if(date>=eras[i][0]) k=i; return k; }
+/* attach per-row pool maxima (known rule changes, never smaller than what was actually drawn) */
+function prepare(g,rows){
+  const em=g.mainEras.map(e=>e[1]), eb=g.bonusEras.map(e=>e[1]);
+  for(const r of rows){
+    r.ei=eraIdx(g.mainEras,r.date); r.ej=eraIdx(g.bonusEras,r.date);
+    let mm=Math.max(...r.m); if(g.same) mm=Math.max(mm,...r.b);
+    if(mm>em[r.ei]) em[r.ei]=mm;
+    if(!g.same){ const bb=Math.max(...r.b); if(bb>eb[r.ej]) eb[r.ej]=bb; }
+  }
+  for(const r of rows){ r.mx=em[r.ei]; r.bx=g.same?r.mx:eb[r.ej]; }
+  return rows;
+}
+
+/* =====================================================================
+   IndexedDB
+   ===================================================================== */
+const DB = {
+  db:null,
+  open(){ return new Promise(res=>{ try{
+      const rq=indexedDB.open('draw-charts',1);
+      rq.onupgradeneeded=()=>rq.result.createObjectStore('games');
+      rq.onsuccess=()=>{ DB.db=rq.result; res(true); };
+      rq.onerror=()=>res(false); rq.onblocked=()=>res(false);
+    }catch(e){ res(false); } }); },
+  tx(mode){ return DB.db.transaction('games',mode).objectStore('games'); },
+  put(k,v){ return new Promise(res=>{ if(!DB.db) return res(false); try{ const r=DB.tx('readwrite').put(v,k); r.onsuccess=()=>res(true); r.onerror=()=>res(false);}catch(e){res(false);} }); },
+  all(){ return new Promise(res=>{ if(!DB.db) return res({}); try{
+      const out={}; const rq=DB.tx('readonly').openCursor();
+      rq.onsuccess=()=>{ const c=rq.result; if(c){ out[c.key]=c.value; c.continue(); } else res(out); };
+      rq.onerror=()=>res({});
+    }catch(e){ res({}); } }); },
+  clear(){ return new Promise(res=>{ if(!DB.db) return res(false); try{ const r=DB.tx('readwrite').clear(); r.onsuccess=()=>res(true); r.onerror=()=>res(false);}catch(e){res(false);} }); }
+};
+const pack = d=>({file:d.file,at:d.at,rat:d.rat||null,rows:d.rows.map(r=>[r.date,r.dn,r.m,r.b])});
+function hydrate(gid,p){ const rows=p.rows.map(a=>({date:a[0],dn:a[1],m:a[2],b:a[3]})); return {file:p.file,at:p.at,rat:p.rat||null,rows:prepare(GAMES[gid],rows)}; }
+
+/* =====================================================================
+   Online data (data/<game>.json published next to the page by the GitHub workflow)
+   ===================================================================== */
+const URL_KEY='dc.dataUrl';
+const isLocalFile=()=>location.protocol==='file:';
+function normBase(u){
+  u=(u||'').trim(); if(!u) return '';
+  if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) u='https://'+u;
+  u=u.split('#')[0].split('?')[0].replace(/index\.html$/i,'');
+  return u.endsWith('/')?u:u+'/';
+}
+function remoteBase(){ return isLocalFile()?normBase(lsGet(URL_KEY,'')):new URL('.',location.href).href; }
+function actionsUrl(){
+  try{
+    const u=new URL(remoteBase()); if(!u.hostname.endsWith('.github.io')) return '';
+    const user=u.hostname.split('.')[0], repo=u.pathname.split('/').filter(Boolean)[0]||(user+'.github.io');
+    return 'https://github.com/'+user+'/'+repo+'/actions/workflows/pages.yml';
+  }catch(e){ return ''; }
+}
+function validRow(g,r){
+  const ok=a=>Array.isArray(a)&&a.every(v=>Number.isInteger(v)&&v>=1&&v<=99);
+  return /^\d{4}-\d{2}-\d{2}$/.test(r.date)&&ok(r.m)&&ok(r.b)&&r.m.length===g.mainN&&r.b.length===g.bonusN&&new Set(r.m).size===g.mainN;
+}
+/* merge by draw date; online data wins when both have the same date */
+function mergeRows(g,oldRows,newRows){
+  const map=new Map(); let added=0, changed=0;
+  for(const r of oldRows) map.set(r.date,{date:r.date,dn:r.dn,m:r.m,b:r.b});
+  for(const r of newRows){
+    const o=map.get(r.date);
+    if(!o) added++; else if(o.m.join()!==r.m.join()||o.b.join()!==r.b.join()) changed++;
+    map.set(r.date,{date:r.date,dn:r.dn!=null?r.dn:(o?o.dn:null),m:[...r.m].sort((x,y)=>x-y),b:[...r.b].sort((x,y)=>x-y)});
+  }
+  const rows=[...map.values()].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  return {rows:prepare(g,rows),added,changed};
+}
+let updating=false;
+async function updateFromRemote(silent){
+  if(updating) return;
+  let base=remoteBase();
+  if(!base){ if(silent) return; if(!askBase()) return; base=remoteBase(); }
+  updating=true; const btn=$('#btnUpdate'); btn.disabled=true; btn.textContent=T('updating');
+  const msgs=[]; let okAny=false, firstChanged=null;
+  for(const gid of ORDER){
+    const g=GAMES[gid];
+    try{
+      const res=await fetch(new URL('data/'+gid+'.json',base).href,{cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const j=await res.json();
+      const rows=(j.rows||[]).map(a=>({date:a[0],dn:a[1],m:a[2],b:a[3]})).filter(r=>validRow(g,r));
+      if(!rows.length) throw new Error('no rows');
+      const old=S.data[gid], mg=mergeRows(g,old?old.rows:[],rows);
+      S.data[gid]={file:old?old.file:'online',at:Date.now(),rat:Date.parse(j.updated)||null,rows:mg.rows};
+      if(!(await DB.put(gid,pack(S.data[gid])))&&!silent) msgs.push(T('storeFail'));
+      okAny=true;
+      if(mg.added||mg.changed){ if(!firstChanged) firstChanged=gid; msgs.push(T('updNew',{g:gname(g),n:mg.added||mg.changed,d:mg.rows[mg.rows.length-1].date})); }
+      else msgs.push(T('updSame',{g:gname(g)}));
+    }catch(e){ msgs.push(T('updFail',{g:gname(g),e:e.message||e})); }
+  }
+  updating=false; btn.disabled=false;
+  if(!silent||okAny) toast(msgs.join('\n'),7000);
+  if(!S.data[S.game]&&okAny) S.game=ORDER.find(id=>S.data[id])||S.game;
+  renderAll();
+}
+function askBase(){
+  const v=prompt(T('askUrl'),lsGet(URL_KEY,''));
+  if(v===null) return false;
+  const b=normBase(v); try{ localStorage.setItem(URL_KEY,JSON.stringify(b)); }catch(e){}
+  renderTop(); return !!b;
+}
+const fmtAt=ms=>{ const d=new Date(ms), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); };
+
+async function importFiles(files){
+  const msgs=[]; let firstOK=null; let storeFail=false; const importedIds=[];
+  for(const f of files){
+    try{
+      const text=(await f.text()).replace(/^﻿/,'');
+      const table=parseCSV(text);
+      const gid=table.length?detectGame(table[0]):null;
+      if(!gid){ msgs.push(T('unknown',{f:f.name})); continue; }
+      const rows=prepare(GAMES[gid],buildRows(GAMES[gid],table));
+      if(!rows.length){ msgs.push(T('noRows',{f:f.name})); continue; }
+      S.data[gid]={file:f.name,at:Date.now(),rows};
+      if(!(await DB.put(gid,pack(S.data[gid])))) storeFail=true;
+      msgs.push(T('imported',{g:gname(GAMES[gid]),n:rows.length,a:rows[0].date,b:rows[rows.length-1].date}));
+      importedIds.push(gid); if(!firstOK) firstOK=gid;
+    }catch(e){ msgs.push(T('noRows',{f:f.name})); }
+  }
+  if(storeFail) msgs.push(T('storeFail'));
+  if(firstOK && !importedIds.includes(S.game)) S.game=firstOK;
+  if(firstOK){ S.period=30; saveSettings(); }
+  toast(msgs.join('\n'),5200);
+  renderAll(true);
+}
+
+/* =====================================================================
+   Statistics
+   ===================================================================== */
+function poolStats(rows,max,getNums,getMax){
+  const N=rows.length, count=new Array(max+1).fill(0), last=new Array(max+1).fill(-1),
+        maxGap=new Array(max+1).fill(0), start=new Array(max+1).fill(N), cur=new Array(max+1).fill(0),
+        avg=new Array(max+1).fill(null), freq=new Array(max+1).fill(0), eff=new Array(max+1).fill(0), floor=new Array(max+1).fill(false);
+  for(let n=1;n<=max;n++){ for(let i=0;i<N;i++){ if(getMax(rows[i])>=n){ start[n]=i; break; } } }
+  for(let i=0;i<N;i++){
+    for(const n of getNums(rows[i])){
+      if(n>max) continue;
+      count[n]++;
+      const prev=last[n]>=0?last[n]:start[n]-1;
+      const gap=i-prev-1; if(gap>maxGap[n]) maxGap[n]=gap;
+      last[n]=i;
+    }
+  }
+  for(let n=1;n<=max;n++){
+    eff[n]=N-start[n];
+    const prev=last[n]>=0?last[n]:start[n]-1;
+    cur[n]=Math.max(0,N-1-prev);
+    if(cur[n]>maxGap[n]) maxGap[n]=cur[n];
+    floor[n]=count[n]===0;
+    avg[n]=count[n]?eff[n]/count[n]:null;
+    freq[n]=eff[n]?count[n]/eff[n]:0;
+  }
+  // hot / cold by normalised frequency
+  const avail=[]; for(let n=1;n<=max;n++) if(eff[n]>0) avail.push(n);
+  const ranked=avail.slice().sort((a,b)=>freq[b]-freq[a]||a-b);
+  const q=Math.max(1,Math.round(avail.length/4)), tag=new Array(max+1).fill(0), heat=new Array(max+1).fill(0.5);
+  ranked.forEach((n,i)=>{ heat[n]=ranked.length>1?1-i/(ranked.length-1):0.5; if(i<q) tag[n]=1; else if(i>=ranked.length-q) tag[n]=-1; });
+  return {count,last,cur,maxGap,avg,freq,eff,start,tag,heat,floor,max,N};
+}
+function recompute(){
+  const d=S.data[S.game]; if(!d){ V=null; return; }
+  const g=G(), all=d.rows;
+  const N = S.period==='all'? all.length : Math.max(1,Math.min(+S.period||100,all.length));
+  const start=all.length-N, rows=all.slice(start);
+  const mainMax=Math.max(...rows.map(r=>r.mx)), bonMax=g.same?mainMax:Math.max(...rows.map(r=>r.bx));
+  const mainStats=poolStats(rows,mainMax,r=>(g.same&&S.incBonus)?r.m.concat(r.b):r.m,r=>r.mx);
+  const bonStats=g.same?null:poolStats(rows,bonMax,r=>r.b,r=>r.bx);
+  V={g,all,rows,N,start,mainMax,bonMax,mainStats,bonStats,metrics:null,pairs:null};
+}
+function curMax(p){
+  const g=G(), d=S.data[S.game];
+  if(d&&d.rows.length){ const r=d.rows[d.rows.length-1]; return p==='m'?r.mx:r.bx; }
+  return p==='m'?g.mainEras[g.mainEras.length-1][1]:g.bonusEras[g.bonusEras.length-1][1];
+}
+function metrics(){
+  if(V.metrics) return V.metrics;
+  const {rows,all,start,g}=V; const M={sums:[],odd:{},low:{},rep:{},cons:{},zone:[],hasCons:0};
+  const inc=(o,k)=>o[k]=(o[k]||0)+1;
+  let zoneTot=new Array(Math.ceil(V.mainMax/10)).fill(0), oddTot=0, highTot=0, repTot=0;
+  rows.forEach((r,i)=>{
+    const prev=i>0?rows[i-1]:(start>0?all[start-1]:null);
+    const sum=r.m.reduce((a,b)=>a+b,0); M.sums.push(sum);
+    const odd=r.m.filter(n=>n%2).length; inc(M.odd,odd); oddTot+=odd;
+    const low=r.m.filter(n=>n<=Math.floor(r.mx/2)).length; inc(M.low,low); highTot+=r.m.length-low;
+    if(prev){ const rep=r.m.filter(n=>prev.m.includes(n)).length; inc(M.rep,rep); repTot+=rep; M.repN=(M.repN||0)+1; }
+    let pairs=0; for(let k=0;k<r.m.length-1;k++) if(r.m[k+1]-r.m[k]===1) pairs++; inc(M.cons,pairs); if(pairs) M.hasCons++;
+    r.m.forEach(n=>zoneTot[Math.floor((n-1)/10)]++);
+  });
+  M.N=rows.length; M.avgSum=M.sums.reduce((a,b)=>a+b,0)/M.N; M.avgOdd=oddTot/M.N; M.avgHigh=highTot/M.N;
+  M.avgRep=M.repN?repTot/M.repN:0; M.zone=zoneTot.map(z=>z/M.N);
+  M.sorted=M.sums.slice().sort((a,b)=>a-b);
+  M.pct=p=>M.sorted[Math.min(M.N-1,Math.max(0,Math.floor(p*(M.N-1))))];
+  return V.metrics=M;
+}
+function pairsStats(){
+  if(V.pairs) return V.pairs;
+  const map=new Map();
+  for(const r of V.rows){ const m=r.m; for(let i=0;i<m.length;i++) for(let j=i+1;j<m.length;j++){ const k=m[i]*1000+m[j]; map.set(k,(map.get(k)||0)+1); } }
+  return V.pairs=[...map.entries()].sort((a,b)=>b[1]-a[1]||a[0]-b[0]).slice(0,30).map(([k,c])=>({a:Math.floor(k/1000),b:k%1000,c}));
+}
+
+/* =====================================================================
+   Chart: one canvas table per pool, page-level scrolling, only visible rows are drawn
+   ===================================================================== */
+const HEAD_H=30, LABEL_W=108, PR=24, OVER=260;
+const FOOT={cnt:88,gap:98,max:58,pad:10}; FOOT.picks=PR*4; FOOT.total=FOOT.picks+FOOT.cnt+FOOT.gap+FOOT.max+FOOT.pad;
+const SETS=['A','B','C','D'], SET_COL=['#2d6ae6','#16a34a','#e08a00','#a24bd8'];
+let BL=[];
+let raf=0;
+function needDraw(){ if(!raf) raf=requestAnimationFrame(()=>{ raf=0; drawAll(); }); }
+const statsFor=p=>(p==='b'&&V&&!V.g.same)?V.bonStats:V.mainStats;
+function rowLabel(r){
+  if(typeof r.dn==='string'&&/^\d\d\/\d+$/.test(r.dn)) return r.dn+' '+r.date.slice(5);   // HK style 26/110 already carries the year
+  return (r.dn!=null?r.dn+' ':'')+r.date.slice(2);
+}
+
+function buildBlocks(){
+  const host=$('#charts'); host.innerHTML=''; BL=[];
+  if(!V) return;
+  const g=V.g;
+  const defs=g.same?[{p:'m',max:V.mainMax}]:[{p:'m',max:V.mainMax},{p:'b',max:V.bonMax}];
+  for(const d of defs){
+    const sec=document.createElement('section'); sec.className='blk';
+    sec.innerHTML='<h2 class="blkTitle"></h2><div class="blkScroll"><div class="blkSizer"><canvas class="cv"></canvas></div></div>';
+    host.appendChild(sec);
+    const cv=sec.querySelector('canvas');
+    const B=Object.assign({},d,{sec,scroll:sec.querySelector('.blkScroll'),sizer:sec.querySelector('.blkSizer'),cv,ctx:cv.getContext('2d'),sx:0,sy:0,headYb:0,W:0,H:0});
+    sec.querySelector('.blkTitle').textContent=(d.p==='m'?g.mName[S.lang]:g.bName[S.lang])+' 1–'+d.max+(g.same?' + '+g.bName[S.lang]:'');
+    B.scroll.addEventListener('scroll',needDraw,{passive:true});
+    cv.addEventListener('pointermove',e=>{ const h=hitAt(B,e); setHover(h?Object.assign(h,{bid:B.p}):null); cv.style.cursor=h?'pointer':'default'; });
+    cv.addEventListener('pointerdown',e=>{ if(e.pointerType!=='mouse'){ const h=hitAt(B,e); setHover(h?Object.assign(h,{bid:B.p}):null); } });
+    cv.addEventListener('pointerleave',e=>{ if(e.pointerType==='mouse') setHover(null); });
+    cv.addEventListener('click',e=>onCanvasClick(B,e));
+    BL.push(B);
+  }
+}
+function layout(){
+  if(!V){ L=null; return; }
+  const wrapW=$('#charts').clientWidth||(document.documentElement.clientWidth-32);
+  const avail=wrapW-LABEL_W-4;
+  let cw=S.cell==='fit'?Math.floor(avail/V.mainMax):S.cell;
+  const minCw=S.cell==='fit'?(wrapW<900?18:14):12;
+  cw=Math.max(minCw,Math.min(44,cw));
+  const rh=Math.max(20,Math.min(30,Math.round(cw*0.95)));
+  const fs=Math.max(10,Math.round(Math.min(rh*0.56,cw*0.62)));
+  L={cw,rh,fs,wrapW};
+  for(const B of BL){
+    B.W=LABEL_W+B.max*cw+4; B.H=HEAD_H+V.N*rh+FOOT.total;
+    B.sizer.style.width=B.W+'px'; B.sizer.style.height=B.H+'px';
+  }
+  if(S.cell==='fit') $('#zoom').value=cw;
+}
+function colors(){
+  const v=cssVar;
+  return {font:v('--font'),bg:v('--panel'),fg:v('--fg'),muted:v('--muted'),grid:v('--grid'),sep:v('--sep'),main:v('--main'),mainFg:v('--main-fg'),
+    bonus:v('--bonus'),bonusFg:v('--bonus-fg'),hl:v('--hl'),pin:v('--pin'),na:v('--na'),barC:v('--bar-count'),barG:v('--bar-gap'),
+    red:v('--red-text'),accent:v('--accent'),head:v('--head'),line:v('--line')};
+}
+function drawAll(){ if(!V||!L) return; const C=colors(); for(const B of BL) drawBlock(B,C); }
+
+function drawBlock(B,C){
+  const vh=innerHeight, dpr=devicePixelRatio||1;
+  const rect=B.sizer.getBoundingClientRect();
+  if(rect.bottom<-OVER||rect.top>vh+OVER) return;
+  const {cw,rh,fs}=L, N=V.N, H=B.H, g=V.g, font=C.font;
+  const cvW=Math.max(1,Math.min(B.W,B.scroll.clientWidth)), ch=Math.min(H,vh+OVER*2);
+  const winTop=-rect.top;
+  const sy=Math.max(0,Math.min(winTop-OVER,H-ch)), sx=B.scroll.scrollLeft;
+  const cv=B.cv, ctx=B.ctx;
+  if(cv.width!==Math.round(cvW*dpr)||cv.height!==Math.round(ch*dpr)){ cv.width=Math.round(cvW*dpr); cv.height=Math.round(ch*dpr); }
+  cv.style.width=cvW+'px'; cv.style.height=ch+'px'; cv.style.transform='translateY('+sy+'px)';
+  const headYb=Math.max(0,Math.min(winTop,N*rh));
+  B.sy=sy; B.sx=sx; B.cvW=cvW; B.ch=ch; B.headYb=headYb;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,cvW,ch);
+
+  const st=statsFor(B.p), max=B.max, tw=max*cw, fb=HEAD_H+N*rh, fEnd=fb+FOOT.total-FOOT.pad;
+  const X=n=>LABEL_W+(n-1)*cw, cm=curMax(B.p);
+  const PK=P(), hv=S.hover, sel=S.sel;
+  const hlCols=[];
+  if(hv&&hv.bid===B.p&&hv.n) hlCols.push(hv.n);
+  if(sel&&sel.bid===B.p&&sel.n) hlCols.push(sel.n);
+  for(const e of S.ext) if(e.p===B.p&&e.n) hlCols.push(e.n);
+  const i0=Math.max(0,Math.floor((sy-HEAD_H)/rh)-1), i1=Math.min(N-1,Math.ceil((sy+ch-HEAD_H)/rh)+1);
+  const yA=Math.max(HEAD_H,sy), yB=Math.min(fb,sy+ch);
+  const tint=(y0,y1)=>{ ctx.globalAlpha=.14; for(let k=0;k<4;k++){ ctx.fillStyle=SET_COL[k]; PK.sets[k][B.p].forEach(n=>{ if(n<=max) ctx.fillRect(X(n),y0,cw,y1-y0); }); } ctx.globalAlpha=1; };
+
+  /* ---------- table area (right of label column) ---------- */
+  ctx.save(); ctx.beginPath(); ctx.rect(LABEL_W,0,cvW-LABEL_W,ch); ctx.clip(); ctx.translate(-sx,-sy);
+  for(let i=i0;i<=i1;i++){
+    const r=V.rows[i], y=HEAD_H+i*rh;
+    if(S.pinned.has(S.game+'|'+r.date)){ ctx.fillStyle=C.pin; ctx.fillRect(LABEL_W,y,tw,rh); }
+    const lim=B.p==='m'?r.mx:r.bx;
+    if(lim<max){ ctx.fillStyle=C.na; ctx.fillRect(X(lim+1),y,(max-lim)*cw,rh); }
+  }
+  if(yB>yA) tint(yA,yB);
+  ctx.lineWidth=1; ctx.strokeStyle=C.grid; ctx.beginPath();
+  for(let i=i0;i<=i1+1;i++){ const y=HEAD_H+i*rh+.5; ctx.moveTo(LABEL_W,y); ctx.lineTo(LABEL_W+tw,y); }
+  for(let n=0;n<=max;n++){ const x=LABEL_W+n*cw+.5; ctx.moveTo(x,yA); ctx.lineTo(x,yB); }
+  ctx.stroke();
+  ctx.strokeStyle=C.sep;
+  for(let n=5;n<max;n+=5){ ctx.lineWidth=(n%10===0)?2:1.5; ctx.beginPath(); const x=X(n+1); ctx.moveTo(x,yA); ctx.lineTo(x,yB); ctx.stroke(); }
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+fs+'px '+font;
+  for(let i=i0;i<=i1;i++){
+    const r=V.rows[i], y=HEAD_H+i*rh;
+    const red=B.p==='m'?r.m:[], blk=B.p==='m'?(g.same?r.b:[]):r.b;
+    for(const n of red){ const x=X(n); ctx.fillStyle=C.main; ctx.fillRect(x+1,y+1,cw-1,rh-1); ctx.fillStyle=C.mainFg; ctx.fillText(n,x+cw/2,y+rh/2+.5); }
+    for(const n of blk){ const x=X(n); ctx.fillStyle=C.bonus; ctx.fillRect(x+1,y+1,cw-1,rh-1); ctx.fillStyle=C.bonusFg; ctx.fillText(n,x+cw/2,y+rh/2+.5); }
+  }
+  /* footer */
+  if(sy+ch>fb){
+    ctx.fillStyle=C.bg; ctx.fillRect(LABEL_W,fb,tw+8,FOOT.total);
+    const c0=fb+FOOT.picks, g0=c0+FOOT.cnt, m0=g0+FOOT.gap;
+    for(let k=0;k<4;k++){
+      const y=fb+k*PR;
+      ctx.fillStyle=C.head; ctx.fillRect(LABEL_W,y,tw,PR);
+      const set=PK.sets[k][B.p];
+      for(let n=1;n<=max;n++){
+        const x=X(n), on=set.has(n);
+        if(n>cm){ ctx.fillStyle=C.na; ctx.fillRect(x+1,y+1,cw-1,PR-1); continue; }
+        if(on){ ctx.fillStyle=SET_COL[k]; ctx.fillRect(x+1,y+1,cw-1,PR-1); }
+        ctx.font=(on?'700 ':'500 ')+fs+'px '+font; ctx.fillStyle=on?'#fff':SET_COL[k]; ctx.globalAlpha=on?1:.6;
+        ctx.fillText(n,x+cw/2,y+PR/2+.5); ctx.globalAlpha=1;
+      }
+    }
+    const mC=Math.max(1,...st.count.slice(1)), mG=Math.max(1,...st.cur.slice(1)), mM=Math.max(1,...st.maxGap.slice(1));
+    ctx.font='700 '+Math.max(10,fs-1)+'px '+font;
+    for(let n=1;n<=max;n++){
+      const x=X(n), cx=x+cw/2;
+      const cb=c0+FOOT.cnt-4, bh=Math.round((FOOT.cnt-30)*st.count[n]/mC);
+      ctx.fillStyle=C.barC; ctx.fillRect(x+cw*.2,cb-bh,cw*.6,bh);
+      ctx.fillStyle=C.red; ctx.fillText(st.count[n],cx,cb-bh-8);
+      const gh=Math.round((FOOT.gap-30)*st.cur[n]/mG);
+      ctx.fillStyle=C.barG; ctx.fillRect(x+cw*.2,g0+2,cw*.6,gh);
+      ctx.fillStyle=C.red; ctx.fillText(st.cur[n],cx,g0+gh+12);
+      const mh=Math.max(2,Math.round(22*st.maxGap[n]/mM));
+      ctx.fillStyle=C.barG; ctx.fillRect(x+cw*.2,m0+2,cw*.6,mh);
+      ctx.fillStyle=C.red; ctx.fillText(st.maxGap[n],cx,m0+2+mh+11);
+    }
+    ctx.strokeStyle=C.grid; ctx.lineWidth=1; ctx.beginPath();
+    for(let n=0;n<=max;n++){ const x=LABEL_W+n*cw+.5; ctx.moveTo(x,fb); ctx.lineTo(x,fEnd); }
+    const ys=[fb]; for(let k=1;k<=4;k++) ys.push(fb+k*PR); ys.push(g0,m0,fEnd);
+    for(const y of ys){ ctx.moveTo(LABEL_W,y+.5); ctx.lineTo(LABEL_W+tw,y+.5); }
+    ctx.stroke();
+    ctx.strokeStyle=C.sep;
+    for(let n=5;n<max;n+=5){ ctx.lineWidth=(n%10===0)?2:1.5; ctx.beginPath(); const x=X(n+1); ctx.moveTo(x,fb); ctx.lineTo(x,fEnd); ctx.stroke(); }
+    tint(c0,fEnd);
+  }
+  /* hover / selection overlays */
+  ctx.fillStyle=C.hl;
+  if(hv&&(hv.kind==='cell'||hv.kind==='rowlabel')&&hv.i>=0&&hv.i<N) ctx.fillRect(LABEL_W,HEAD_H+hv.i*rh,tw,rh);
+  for(const n of hlCols) if(n<=max) ctx.fillRect(X(n),HEAD_H,cw,fEnd-HEAD_H);
+  ctx.lineWidth=2; ctx.strokeStyle=C.fg;
+  if(hv&&hv.kind==='cell'&&hv.bid===B.p) ctx.strokeRect(X(hv.n)+1,HEAD_H+hv.i*rh+1,cw-1,rh-1);
+  if(sel&&sel.kind==='cell'&&sel.bid===B.p&&sel.i<N) ctx.strokeRect(X(sel.n)+1,HEAD_H+sel.i*rh+1,cw-1,rh-1);
+  ctx.restore();
+
+  /* ---------- left label column ---------- */
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,LABEL_W,ch); ctx.clip(); ctx.translate(0,-sy);
+  ctx.fillStyle=C.head; ctx.fillRect(0,HEAD_H,LABEL_W,fEnd-HEAD_H);
+  ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='500 '+Math.min(13,Math.max(11,fs))+'px '+font;
+  for(let i=i0;i<=i1;i++){
+    const r=V.rows[i], y=HEAD_H+i*rh;
+    if(S.pinned.has(S.game+'|'+r.date)){ ctx.fillStyle=C.pin; ctx.fillRect(0,y,LABEL_W,rh); }
+    if(hv&&hv.i===i&&(hv.kind==='cell'||hv.kind==='rowlabel')){ ctx.fillStyle=C.hl; ctx.fillRect(0,y,LABEL_W,rh); }
+    ctx.fillStyle=C.fg; ctx.fillText(rowLabel(r),8,y+rh/2+.5);
+    ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,y+rh+.5); ctx.lineTo(LABEL_W,y+rh+.5); ctx.stroke();
+  }
+  if(sy+ch>fb){
+    const c0=fb+FOOT.picks, g0=c0+FOOT.cnt, m0=g0+FOOT.gap;
+    for(let k=0;k<4;k++){
+      const y=fb+k*PR;
+      if(PK.active===k){ ctx.globalAlpha=.16; ctx.fillStyle=SET_COL[k]; ctx.fillRect(0,y,LABEL_W,PR); ctx.globalAlpha=1; }
+      ctx.fillStyle=SET_COL[k]; ctx.fillRect(8,y+PR/2-8,16,16);
+      ctx.fillStyle='#fff'; ctx.font='700 11px '+font; ctx.textAlign='center'; ctx.fillText(SETS[k],16,y+PR/2+.5);
+      ctx.textAlign='left'; ctx.fillStyle=C.fg; ctx.font=(PK.active===k?'700 ':'500 ')+'12.5px '+font; ctx.fillText(T('pickRow'),30,y+PR/2+.5);
+    }
+    ctx.fillStyle=C.fg; ctx.font='600 13px '+font;
+    ctx.fillText(T('cnt'),8,c0+FOOT.cnt/2); ctx.fillText(T('gapNow'),8,g0+FOOT.gap/2); ctx.fillText(T('gapMax'),8,m0+FOOT.max/2-4);
+  }
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(LABEL_W-.5,HEAD_H); ctx.lineTo(LABEL_W-.5,fEnd); ctx.stroke();
+  ctx.restore();
+
+  /* ---------- sticky number header ---------- */
+  const hy=headYb-sy;
+  if(winTop>0&&headYb>0){ ctx.fillStyle='rgba(0,0,0,.10)'; ctx.fillRect(0,hy+HEAD_H,cvW,3); }
+  ctx.fillStyle=C.head; ctx.fillRect(0,hy,cvW,HEAD_H);
+  const act=PK.active, aset=PK.sets[act][B.p];
+  ctx.save(); ctx.beginPath(); ctx.rect(LABEL_W,hy,cvW-LABEL_W,HEAD_H); ctx.clip(); ctx.translate(-sx,0);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fs+'px '+font;
+  for(let n=1;n<=max;n++){
+    const x=X(n), on=aset.has(n);
+    if(on){ ctx.fillStyle=SET_COL[act]; ctx.fillRect(x+1,hy+3,cw-1,HEAD_H-6); }
+    else if(hlCols.includes(n)){ ctx.fillStyle=C.hl; ctx.fillRect(x+1,hy+3,cw-1,HEAD_H-6); }
+    ctx.fillStyle=on?'#fff':C.accent; ctx.fillText(n,x+cw/2,hy+HEAD_H/2+1);
+  }
+  ctx.restore();
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,hy+HEAD_H-.5); ctx.lineTo(cvW,hy+HEAD_H-.5); ctx.moveTo(LABEL_W-.5,hy); ctx.lineTo(LABEL_W-.5,hy+HEAD_H); ctx.stroke();
+  ctx.fillStyle=C.muted; ctx.font='500 12px '+font; ctx.textAlign='left'; ctx.fillText(T('draws')+' / '+(S.lang==='zh'?'日期':'Date'),8,hy+HEAD_H/2+1);
+}
+
+/* ---------- hit testing & interaction ---------- */
+function hitTest(B,mx,my){
+  if(!V||!L) return null;
+  const {cw,rh}=L, N=V.N, yb=my+B.sy, fb=HEAD_H+N*rh;
+  let n=0;
+  if(mx>=LABEL_W){ const k=Math.floor((mx+B.sx-LABEL_W)/cw)+1; if(k>=1&&k<=B.max) n=k; }
+  if(yb>=B.headYb&&yb<B.headYb+HEAD_H) return n?{kind:'head',n,i:-1}:null;
+  if(yb>=HEAD_H&&yb<fb){ const i=Math.floor((yb-HEAD_H)/rh); if(mx<LABEL_W) return {kind:'rowlabel',i,n:0}; return n?{kind:'cell',i,n}:null; }
+  if(n&&yb>=fb&&yb<fb+FOOT.total-FOOT.pad){ const off=yb-fb; return off<FOOT.picks?{kind:'pick',k:Math.floor(off/PR),n,i:-1}:{kind:'stat',n,i:-1}; }
+  return null;
+}
+function hitAt(B,e){ const r=B.cv.getBoundingClientRect(); return hitTest(B,e.clientX-r.left,e.clientY-r.top); }
+function setHover(h){
+  const a=S.hover;
+  if((!a&&!h)||(a&&h&&a.kind===h.kind&&a.i===h.i&&a.n===h.n&&a.bid===h.bid)) return;
+  S.hover=h; needDraw();
+}
+function onCanvasClick(B,e){
+  const h=hitAt(B,e);
+  if(!h){ hideInfo(); return; }
+  const cm=curMax(B.p);
+  if(h.kind==='cell'||h.kind==='stat'){ showInfo(e,B,h); return; }
+  if(h.kind==='head'){ if(h.n<=cm) togglePick(B.p,h.n); }
+  else if(h.kind==='pick'){ if(h.n<=cm){ P().active=h.k; togglePick(B.p,h.n,h.k); } }
+  else if(h.kind==='rowlabel'){ const k=S.game+'|'+V.rows[h.i].date; S.pinned.has(k)?S.pinned.delete(k):S.pinned.add(k); needDraw(); }
+  hideInfo();
+}
+
+/* ---------- info box (opens on click) ---------- */
+const tip=$('#tip');
+function numStat(p,n){
+  const st=statsFor(p); if(!st||n>st.max) return null;
+  return {c:st.count[n],f:(st.freq[n]*100).toFixed(1),g:st.cur[n],a:st.avg[n]==null?'-':st.avg[n].toFixed(1),m:st.maxGap[n],last:st.last[n]};
+}
+function infoHTML(B,h){
+  const g=V.g, p=B.p, out=[]; let na=false;
+  if(h.kind==='cell'){
+    const r=V.rows[h.i];
+    out.push('<div class="h"><b>'+(r.dn!=null?T('tipDraw',{n:r.dn})+' · ':'')+r.date+'（'+weekday(r.date)+'）</b></div>');
+    out.push('<div class="nums">'+g.mName[S.lang]+'：'+r.m.map(n=>'<span class="m">'+n+'</span>').join('')+'</div>');
+    out.push('<div class="nums">'+g.bName[S.lang]+'：'+r.b.map(n=>'<span class="b">'+n+'</span>').join('')+'</div>');
+    na=(p==='m'?r.mx:r.bx)<h.n;
+  }
+  const s=numStat(p,h.n), nm=g.same?'':'（'+(p==='m'?g.mName[S.lang]:g.bName[S.lang])+'）';
+  out.push('<div class="h'+(h.kind==='cell'?' sep':'')+'"><b>'+T('tipNum',{n:h.n})+'</b>'+nm+'</div>');
+  if(na) out.push('<div>'+T('tipNA')+'</div>');
+  else if(s){
+    out.push('<div>'+T('tipStat',{c:s.c,f:s.f,g:s.g,a:s.a,m:s.m})+'</div>');
+    out.push('<div>'+(s.last>=0?T('tipLast',{d:V.rows[s.last].date}):T('tipNever'))+'</div>');
+  }
+  return out.join('');
+}
+function showInfo(e,B,h){
+  S.sel={bid:B.p,kind:h.kind,i:h.i,n:h.n};
+  tip.innerHTML='<button class="x" aria-label="'+T('close')+'">×</button>'+infoHTML(B,h);
+  tip.style.display='block';
+  const w=tip.offsetWidth, hh=tip.offsetHeight, ox=scrollX, oy=scrollY, vw=document.documentElement.clientWidth, vh=innerHeight;
+  const gx=L.cw+8, gy=L.rh+8;
+  let x=e.pageX+gx; if(x+w>ox+vw-8) x=e.pageX-w-gx; if(x<ox+4) x=ox+4;
+  let y=e.pageY+gy; if(y+hh>oy+vh-8) y=e.pageY-hh-gy; if(y<oy+4) y=oy+4;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+  needDraw();
+}
+function hideInfo(){ if(tip.style.display==='block'||S.sel){ tip.style.display='none'; S.sel=null; needDraw(); } }
+document.addEventListener('click',e=>{
+  if(e.target.closest('#tip')){ if(e.target.closest('.x')) hideInfo(); return; }
+  if(e.target.tagName==='CANVAS') return;
+  hideInfo();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') hideInfo(); });
+
+/* ---------- page-level events ---------- */
+const toTop=$('#toTop');
+const smooth=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+const goTo=el=>{ if(el) scrollTo({top:Math.max(0,el.getBoundingClientRect().top+scrollY-8),behavior:smooth()}); };
+addEventListener('scroll',()=>{ toTop.classList.toggle('show',scrollY>innerHeight*0.7); needDraw(); },{passive:true});
+addEventListener('resize',needDraw);
+toTop.addEventListener('click',()=>scrollTo({top:0,behavior:smooth()}));
+$('#goPick').addEventListener('click',()=>goTo($('#tabs')));
+$('#goBonus').addEventListener('click',()=>goTo(BL[1]&&BL[1].sec));
+let lastW=0;
+new ResizeObserver(()=>{ const w=$('#charts').clientWidth; if(w!==lastW){ lastW=w; if(V){ layout(); } needDraw(); } }).observe($('#charts'));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',needDraw);
+
+/* =====================================================================
+   Top bar & controls
+   ===================================================================== */
+function renderTop(){
+  document.documentElement.lang=S.lang==='zh'?'zh-HK':'en';
+  document.title=T('title');
+  $('#ttl').textContent=T('title');
+  $('#btnLang').textContent=S.lang==='zh'?'EN':'繁';
+  $('#btnImport').textContent=T('import'); $('#btnClear').textContent=T('clear');
+  $('#games').innerHTML=ORDER.map(id=>{ const g=GAMES[id], d=S.data[id];
+    return `<button data-g="${id}" class="${S.game===id?'on':''} ${d?'':'nodata'}">${esc(gname(g))}${d?`<small>${d.rows.length}</small>`:''}</button>`; }).join('');
+  const all=[20,30,40,50,100,200,500];
+  $('#periods').innerHTML=all.map(n=>`<button data-n="${n}" class="${S.period===n?'on':''}">${n}</button>`).join('')+
+    `<button data-n="all" class="${S.period==='all'?'on':''}">${T('all')}</button>`+
+    `<input type="number" min="1" id="customN" placeholder="${T('custom')}" value="${all.includes(S.period)||S.period==='all'?'':S.period}" aria-label="${T('custom')}">`+
+    `<span class="lbl">${T('perN')}</span>`;
+  $('#lblZoom').textContent=T('zoom'); $('#btnFit').textContent=T('fit'); $('#btnFit').classList.toggle('primary',S.cell==='fit');
+  if(S.cell!=='fit') $('#zoom').value=S.cell; else if(L) $('#zoom').value=L.cw;
+  $('#incWrap').style.display=G().same?'inline-flex':'none'; $('#lblInc').textContent=T('incBonus'); $('#incBonus').checked=S.incBonus;
+  const g=G();
+  $('#legend').innerHTML=`<span><i class="sw m"></i>${g.mName[S.lang]}</span><span><i class="sw b"></i>${g.bName[S.lang]}</span><span><i class="sw n"></i>${T('ln')}</span><span><i class="sw p"></i>${T('lp')}</span>`;
+  $('#tabs').innerHTML=[['pick','tabPick'],['nums','tabNums'],['dist','tabDist'],['pairs','tabPairs']].map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${T(l)}</button>`).join('');
+  $$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+S.tab));
+  $('#note').textContent=T('notice');
+  const em=$('#empty');
+  $('#toTop').setAttribute('aria-label',T('toTop')); $('#toTop').title=T('toTop'); $('#lblTop').textContent=T('navTop');
+  $('#goPick').textContent=T('navPick');
+  $('#goBonus').textContent=G().bName[S.lang]; $('#goBonus').hidden=!V||G().same;
+  $('#fab').classList.toggle('show',!!V);
+  $('#btnUpdate').textContent=updating?T('updating'):T('update');
+  const d0=S.data[S.game], last=d0&&d0.rows[d0.rows.length-1];
+  $('#dataText').textContent=last?(T('lastDraw')+' '+last.date+(last.dn!=null?'（'+last.dn+'）':'')+' · '+(d0.rat?T('siteAt')+' '+fmtAt(d0.rat):T('importedAt')+' '+fmtAt(d0.at))):'';
+  const run=actionsUrl(); $('#lnkRun').hidden=!run; if(run){ $('#lnkRun').href=run; $('#lnkRun').textContent=T('runGh'); }
+  $('#btnUrl').hidden=!isLocalFile(); $('#btnUrl').textContent=T('dataUrl');
+  $('#dataInfo').style.display=($('#dataText').textContent||run||isLocalFile())?'flex':'none';
+  if(!V){ em.style.display='block'; em.querySelector('.inner').innerHTML=`<h2>${T('emptyTitle',{g:esc(gname(G()))})}</h2><p>${T('emptyBody')}</p><p>${T('privacy')}</p><p><button class="btn primary" id="emptyImport">${T('import')}</button></p>`; }
+  else em.style.display='none';
+}
+$('#games').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.game=b.dataset.g; S.hover=null; S.ext=[]; saveSettings(); renderAll(true); });
+$('#periods').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.period=b.dataset.n==='all'?'all':+b.dataset.n; saveSettings(); renderAll(true); });
+$('#periods').addEventListener('change',e=>{ if(e.target.id==='customN'){ const n=parseInt(e.target.value,10); if(n>=1){ S.period=n; saveSettings(); renderAll(true); } } });
+$('#periods').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='customN') e.target.dispatchEvent(new Event('change',{bubbles:true})); });
+$('#zoom').addEventListener('input',e=>{ S.cell=+e.target.value; saveSettings(); $('#btnFit').classList.remove('primary'); layout(true); needDraw(); });
+$('#btnFit').addEventListener('click',()=>{ S.cell='fit'; saveSettings(); layout(true); renderTop(); needDraw(); });
+$('#incBonus').addEventListener('change',e=>{ S.incBonus=e.target.checked; saveSettings(); renderAll(false); });
+$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.tab=b.dataset.t; saveSettings(); renderTop(); renderPanels(); });
+$('#btnLang').addEventListener('click',()=>{ S.lang=S.lang==='zh'?'en':'zh'; saveSettings(); renderAll(false); });
+$('#btnImport').addEventListener('click',()=>$('#file').click());
+$('#btnUpdate').addEventListener('click',()=>updateFromRemote(false));
+$('#btnUrl').addEventListener('click',()=>askBase());
+$('#empty').addEventListener('click',e=>{ if(e.target.id==='emptyImport') $('#file').click(); });
+$('#file').addEventListener('change',e=>{ if(e.target.files.length) importFiles([...e.target.files]); e.target.value=''; });
+$('#btnClear').addEventListener('click',async()=>{
+  if(!confirm(T('clearAsk'))) return;
+  await DB.clear(); S.data={}; S.tickets={}; S.pick={}; S.pinned.clear(); try{ localStorage.removeItem('dc.tickets'); }catch(e){}
+  toast(T('cleared')); renderAll(true);
+});
+let dragDepth=0;
+addEventListener('dragenter',e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){ dragDepth++; $('#dropMask').style.display='flex'; $('#dropMask').textContent=T('import'); } });
+addEventListener('dragleave',()=>{ dragDepth=Math.max(0,dragDepth-1); if(!dragDepth) $('#dropMask').style.display='none'; });
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('#dropMask').style.display='none'; if(e.dataTransfer.files.length) importFiles([...e.dataTransfer.files]); });
+
+/* =====================================================================
+   Picker (four independent sets A–D; picking is not limited by the game rules)
+   ===================================================================== */
+function togglePick(p,n,k){
+  const pk=P(); if(k==null) k=pk.active;
+  const s=pk.sets[k][p]; s.has(n)?s.delete(n):s.add(n);
+  needDraw(); refreshPick();
+}
+function refreshPick(){ if($('#pkGrids')) renderPickGrid(); }
+function setExt(list){ S.ext=list; needDraw(); }
+const ballH=(n,b)=>'<span class="ball'+(b?' b':'')+'">'+n+'</span>';
+const sortN=a=>[...a].sort((x,y)=>x-y);
+
+function renderPicker(){
+  const g=G(), el=$('#p-pick'), hasData=!!V;
+  el.innerHTML=`<div class="pk">
+    <div>
+      <div class="pk-head">
+        <span class="lbl">${T('editing')}</span>
+        <div class="seg" id="setSeg">${SETS.map((s,k)=>`<button data-k="${k}" style="--sc:${SET_COL[k]}">${s}</button>`).join('')}</div>
+        <div class="seg" id="modeSeg">${['pick','must','excl'].map(m=>`<button data-m="${m}" class="${S.mode===m?'on':''}">${T('mode'+m[0].toUpperCase()+m.slice(1))}</button>`).join('')}</div>
+        <label class="chk"><input type="checkbox" id="heatChk" ${S.heat?'checked':''}> ${T('heat')}</label>
+      </div>
+      <div class="lbl" style="margin-bottom:8px">${T('mustHint')}</div>
+      <div id="pkGrids"></div>
+      <div class="pk-summary" id="pkSummary"></div>
+      <div class="btnrow"><button class="btn" id="btnClearAll">${T('clearAll')}</button></div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>${T('random')}</h3>
+        <div class="opt">
+          <label for="oParity">${T('parity')}</label><select id="oParity"></select>
+          <label for="oSize">${T('size')}</label><select id="oSize"></select>
+          <label for="oSmin">${T('sum')}</label>
+          <div><input type="number" id="oSmin" value="${S.rnd.smin}"> – <input type="number" id="oSmax" value="${S.rnd.smax}"> <button class="btn small" id="oHist" ${hasData?'':'disabled'}>${T('histRange')}</button></div>
+          <label for="oHot">${T('hot')}</label><input type="number" min="0" max="${g.pickMain}" id="oHot" value="${S.rnd.hot}">
+          <label for="oCold">${T('cold')}</label><input type="number" min="0" max="${g.pickMain}" id="oCold" value="${S.rnd.cold}">
+          <label for="oCons">${T('consec')}</label><select id="oCons">
+            <option value="">${T('any')}</option><option value="avoid">${T('avoid')}</option><option value="atleast">${T('atleast')}</option></select>
+        </div>
+        <div class="err" id="rndErr"></div>
+        <div class="btnrow"><button class="btn primary" id="btnRnd1">${T('rndOne')}</button><button class="btn primary" id="btnRnd4">${T('rndFour')}</button></div>
+        <div class="btnrow" style="margin-top:8px"><input type="number" min="1" max="50" id="oQty" value="${S.rnd.qty}" style="width:62px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel)">
+          <button class="btn" id="btnRndN"></button></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>${T('tickets')}</h3><div id="tickets"></div></div>
+    </div></div>`;
+  fillRandomSelects();
+  renderPickGrid(); renderTickets();
+}
+function fillRandomSelects(){
+  const g=G(), k=g.pickMain, pm=curMax('m'), low=Math.floor(pm/2);
+  let o=`<option value="">${T('any')}</option>`; for(let i=0;i<=k;i++) o+=`<option value="${i}">${i}${T('odd')} ${k-i}${T('even')}</option>`;
+  $('#oParity').innerHTML=o; $('#oParity').value=S.rnd.parity;
+  o=`<option value="">${T('any')}</option>`; for(let i=0;i<=k;i++) o+=`<option value="${i}">${i}${T('lowW')} ${k-i}${T('highW')}（≤${low}）</option>`;
+  $('#oSize').innerHTML=o; $('#oSize').value=S.rnd.size; $('#oCons').value=S.rnd.consec;
+  $('#btnRndN').textContent=T('rndMany',{n:S.rnd.qty});
+}
+function renderPickGrid(){
+  const g=G(), pk=P(), pm=curMax('m'), pb=curMax('b'), act=pk.active;
+  const mk=(pool,max,st)=>{ let h='';
+    const must=pk[pool==='m'?'mm':'mb'], ex=pk[pool==='m'?'xm':'xb'];
+    for(let n=1;n<=max;n++){
+      const sel=pk.sets[act][pool].has(n);
+      let style='--sc:'+SET_COL[act]+';';
+      if(!sel&&S.heat&&st&&n<=st.max&&st.eff[n]>0){ const h2=st.heat[n], a=(Math.abs(h2-.5)*1.1).toFixed(2), c=h2>.5?'rgba(220,75,62,'+a+')':'rgba(45,106,230,'+a+')'; style+='background-image:linear-gradient('+c+','+c+');'; }
+      let dots=''; pk.sets.forEach((s,k)=>{ if(k!==act&&s[pool].has(n)) dots+='<i class="dot" style="background:'+SET_COL[k]+';left:'+(4+k*7)+'px"></i>'; });
+      h+=`<button class="num ${sel?'sel':''} ${must.has(n)?'must':''} ${ex.has(n)?'excl':''}" data-p="${pool}" data-n="${n}" style="${style}">${n}${dots}</button>`;
+    }
+    return h; };
+  let html=`<h3>${g.mName[S.lang]} 1–${pm}</h3><div class="grid">${mk('m',pm,V&&V.mainStats)}</div>`;
+  if(!g.same) html+=`<h3>${g.bName[S.lang]} 1–${pb}</h3><div class="grid">${mk('b',pb,V&&V.bonStats)}</div>`;
+  $('#pkGrids').innerHTML=html;
+  $$('#setSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.k===act));
+  const k=g.pickMain;
+  let sm=`<div class="lbl" style="margin-bottom:6px">${T('rule',{k})}${g.pickBonus?T('ruleB',{b:g.bName[S.lang],kb:g.pickBonus}):''}</div>`;
+  sm+=pk.sets.map((s,i)=>{
+    const ms=sortN(s.m), bs=sortN(s.b);
+    return `<div class="srow ${i===act?'act':''}" data-k="${i}"><b class="sl" style="background:${SET_COL[i]}">${SETS[i]}</b>
+      <span class="sb">${ms.length?ms.map(n=>ballH(n)).join(''):'<span class="lbl">'+T('none')+'</span>'}${(!g.same&&bs.length)?' + '+bs.map(n=>ballH(n,1)).join(''):''}</span>
+      <span class="sbtn"><button class="btn small" data-sa="clr" data-k="${i}">${T('clr1')}</button><button class="btn small" data-sa="save" data-k="${i}">${T('save1')}</button></span></div>`;
+  }).join('');
+  const a=pk.sets[act], am=a.m.size;
+  if(am>=k){ let c=comb(am,k); if(!g.same&&g.pickBonus&&a.b.size>=g.pickBonus) c*=comb(a.b.size,g.pickBonus); sm+=`<div class="lbl" style="margin-top:6px">${SETS[act]}：${T('combos',{c:c.toLocaleString()})}</div>`; }
+  else sm+=`<div class="lbl" style="margin-top:6px">${SETS[act]}：${T('needMore',{n:k-am})}</div>`;
+  $('#pkSummary').innerHTML=sm;
+}
+$('#p-pick').addEventListener('click',e=>{
+  const n=e.target.closest('.num');
+  if(n){ const pool=n.dataset.p, num=+n.dataset.n, pk=P();
+    if(S.mode==='pick') togglePick(pool,num);
+    else { const key=S.mode==='must'?(pool==='m'?'mm':'mb'):(pool==='m'?'xm':'xb'), other=S.mode==='must'?(pool==='m'?'xm':'xb'):(pool==='m'?'mm':'mb');
+      const s=pk[key]; if(s.has(num)) s.delete(num); else { s.add(num); pk[other].delete(num); } renderPickGrid(); }
+    return; }
+  const b=e.target.closest('button');
+  if(!b){ const row=e.target.closest('.srow'); if(row){ P().active=+row.dataset.k; renderPickGrid(); needDraw(); } return; }
+  if(b.closest('#modeSeg')){ S.mode=b.dataset.m; $$('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b)); }
+  else if(b.closest('#setSeg')){ P().active=+b.dataset.k; renderPickGrid(); needDraw(); }
+  else if(b.dataset.sa){
+    const k=+b.dataset.k, s=P().sets[k];
+    if(b.dataset.sa==='clr'){ s.m.clear(); s.b.clear(); renderPickGrid(); needDraw(); }
+    else { if(!s.m.size&&!s.b.size) return toast(T('noPickSave')); addTicket({m:sortN(s.m),b:sortN(s.b)}); }
+  }
+  else if(b.id==='btnClearAll'){ P().sets.forEach(s=>{ s.m.clear(); s.b.clear(); }); renderPickGrid(); needDraw(); }
+  else if(b.id==='btnRnd1'){ const r=randomTicket(); showRndErr(r.err); if(!r.err){ const s=P().sets[P().active]; s.m=new Set(r.m); s.b=new Set(r.b); renderPickGrid(); needDraw(); } }
+  else if(b.id==='btnRnd4'){ const pk=P(); for(let k=0;k<4;k++){ const r=randomTicket(); showRndErr(r.err); if(r.err) break; pk.sets[k].m=new Set(r.m); pk.sets[k].b=new Set(r.b); } renderPickGrid(); needDraw(); }
+  else if(b.id==='btnRndN'){ const q=Math.max(1,Math.min(50,+S.rnd.qty||1)); for(let i=0;i<q;i++){ const r=randomTicket(); showRndErr(r.err); if(r.err) break; addTicket({m:r.m,b:r.b},true); } saveTickets(); renderTickets(); }
+  else if(b.id==='oHist'&&V){ const M=metrics(); $('#oSmin').value=S.rnd.smin=M.pct(.1); $('#oSmax').value=S.rnd.smax=M.pct(.9); saveSettings(); }
+  else if(b.dataset.tk!=null){ const i=+b.dataset.tk, tk=S.tickets[S.game][i];
+    if(b.dataset.act==='del'){ S.tickets[S.game].splice(i,1); saveTickets(); renderTickets(); }
+    else if(b.dataset.act==='load'){ const s=P().sets[P().active]; s.m=new Set(tk.m); s.b=new Set(tk.b); renderPickGrid(); needDraw(); } }
+  else if(b.id==='btnCopy'){ copyTickets(); }
+});
+$('#p-pick').addEventListener('change',e=>{
+  const id=e.target.id, v=e.target.value;
+  if(id==='heatChk'){ S.heat=e.target.checked; saveSettings(); renderPickGrid(); }
+  else if(id==='oParity') S.rnd.parity=v; else if(id==='oSize') S.rnd.size=v; else if(id==='oCons') S.rnd.consec=v;
+  else if(id==='oSmin') S.rnd.smin=v; else if(id==='oSmax') S.rnd.smax=v;
+  else if(id==='oHot') S.rnd.hot=+v||0; else if(id==='oCold') S.rnd.cold=+v||0;
+  else if(id==='oQty'){ S.rnd.qty=+v||1; $('#btnRndN').textContent=T('rndMany',{n:S.rnd.qty}); }
+  saveSettings();
+});
+$('#p-pick').addEventListener('input',e=>{ if(e.target.id==='oQty'){ S.rnd.qty=+e.target.value||1; $('#btnRndN').textContent=T('rndMany',{n:S.rnd.qty}); } });
+// hover on the number grid highlights the chart column
+$('#p-pick').addEventListener('pointerover',e=>{ const n=e.target.closest('.num'); if(n&&e.pointerType==='mouse') setExt([{p:n.dataset.p,n:+n.dataset.n}]); });
+$('#p-pick').addEventListener('pointerout',e=>{ const n=e.target.closest('.num'); if(n&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.num'))) setExt([]); });
+function showRndErr(err){ const el=$('#rndErr'); if(!el) return; if(!err){ el.textContent=''; return; }
+  const g=G(); el.textContent=T(err.key,{k:g.pickMain,b:g.bName[S.lang]}); }
+
+/* random picks that follow the game rules */
+function hotCold(st,which){ const out=[]; for(let n=1;n<=st.max;n++) if(st.eff[n]>0&&st.tag[n]===which) out.push(n); return out; }
+function randomTicket(){
+  const g=G(), p=P(), k=g.pickMain, kb=g.pickBonus, pm=curMax('m'), pb=curMax('b'), o=S.rnd;
+  const must=[...p.mm].filter(n=>n<=pm), excl=new Set([...p.xm]);
+  if(must.some(n=>excl.has(n))) return {err:{key:'errMustExcl'}};
+  if(must.length>k) return {err:{key:'errMust'}};
+  const pool=[]; for(let n=1;n<=pm;n++) if(!excl.has(n)) pool.push(n);
+  if(pool.length<k) return {err:{key:'errPool'}};
+  const hotN=+o.hot||0, coldN=+o.cold||0;
+  if(hotN+coldN>k) return {err:{key:'errHC'}};
+  if((hotN||coldN)&&!V) return {err:{key:'errNeedData'}};
+  const hot=new Set(V?hotCold(V.mainStats,1):[]), cold=new Set(V?hotCold(V.mainStats,-1):[]);
+  const low=Math.floor(pm/2), smin=o.smin===''?-Infinity:+o.smin, smax=o.smax===''?Infinity:+o.smax;
+  for(let a=0;a<40000;a++){
+    const set=new Set(must);
+    const take=(arr,cnt)=>{ const c=shuffle(arr.filter(n=>!set.has(n)&&!excl.has(n)&&n<=pm)); for(let i=0;i<c.length&&cnt>0&&set.size<k;i++){ set.add(c[i]); cnt--; } };
+    const hn=hotN-[...set].filter(n=>hot.has(n)).length, cn=coldN-[...set].filter(n=>cold.has(n)).length;
+    if(hn>0) take([...hot],hn); if(cn>0) take([...cold],cn);
+    take(pool,k-set.size);
+    if(set.size!==k) continue;
+    const arr=[...set].sort((x,y)=>x-y);
+    if(o.parity!==''&&arr.filter(n=>n%2).length!==+o.parity) continue;
+    if(o.size!==''&&arr.filter(n=>n<=low).length!==+o.size) continue;
+    const sum=arr.reduce((x,y)=>x+y,0); if(sum<smin||sum>smax) continue;
+    let pairs=0; for(let i=0;i<arr.length-1;i++) if(arr[i+1]-arr[i]===1) pairs++;
+    if(o.consec==='avoid'&&pairs>0) continue; if(o.consec==='atleast'&&pairs===0) continue;
+    let bonus=[];
+    if(kb){
+      const bm=[...p.mb].filter(n=>n<=pb), bx=new Set([...p.xb]);
+      if(bm.some(n=>bx.has(n))) return {err:{key:'errMustExcl'}};
+      const bpool=[]; for(let n=1;n<=pb;n++) if(!bx.has(n)&&!bm.includes(n)) bpool.push(n);
+      const bs=new Set(bm.slice(0,kb)); const c=shuffle(bpool); for(let i=0;i<c.length&&bs.size<kb;i++) bs.add(c[i]);
+      if(bs.size<kb) return {err:{key:'errBonusPool'}};
+      bonus=[...bs].sort((x,y)=>x-y);
+    }
+    return {m:arr,b:bonus};
+  }
+  return {err:{key:'errCond'}};
+}
+
+/* saved lines + history check */
+function addTicket(tk,silent){ (S.tickets[S.game] ||= []).unshift({m:tk.m,b:tk.b}); if(!silent){ saveTickets(); renderTickets(); } }
+function checkTicket(tk){
+  const d=S.data[S.game]; if(!d) return null; const g=G(), k=g.pickMain, ms=new Set(tk.m), bs=new Set(tk.b);
+  const dist={}, combos={}; let best=-1, bestRow=null;
+  for(const r of d.rows){
+    const j=r.m.filter(n=>ms.has(n)).length, bo=r.b.filter(n=>bs.has(n)).length;
+    const bm=g.same?(r.b.some(n=>ms.has(n))?1:0):bo;
+    dist[j]=(dist[j]||0)+1;
+    if(j>=k-2){ const key=j+'|'+bm; combos[key]=(combos[key]||0)+1; }
+    if(j>best){ best=j; bestRow=r; } else if(j===best) bestRow=r;
+  }
+  return {dist,combos,best,bestRow,k};
+}
+function renderTickets(){
+  const el=$('#tickets'); if(!el) return; const list=S.tickets[S.game]||[], g=G();
+  if(!list.length){ el.innerHTML=`<div class="lbl">${T('noTickets')}</div>`; return; }
+  el.innerHTML=list.map((tk,i)=>{
+    const c=checkTicket(tk); let meta='';
+    if(c){
+      const chips=[]; for(let j=c.k;j>=Math.max(1,c.k-3);j--) if(c.dist[j]) chips.push(`<span class="chip ${j===c.k?'hit':''}">${T('hitDist')} ${j}：${c.dist[j]} ${T('times')}</span>`);
+      const cmb=Object.entries(c.combos).filter(([key])=>+key.split('|')[1]>0).sort((a,b)=>{ const [aj,ab]=a[0].split('|').map(Number),[bj,bb]=b[0].split('|').map(Number); return bj-aj||bb-ab; }).slice(0,3)
+        .map(([key,n])=>{ const [j,b]=key.split('|'); return `<span class="chip">${j}+${g.same?'B':b}：${n} ${T('times')}</span>`; });
+      meta=`<div class="meta">${T('histTitle')}（${d_len()} ${T('times')}）${c.best>=Math.max(1,c.k-3)?'':` · ${T('never',{k:c.k})}`}</div><div>${chips.join('')}${cmb.join('')}</div>`;
+      if(c.bestRow) meta+=`<div class="meta">${T('bestHit')} ${c.best}/${c.k}（${T('last')} ${c.bestRow.date}）</div>`;
+    }
+    return `<div class="tk"><div>${tk.m.map(n=>`<span class="ball">${n}</span>`).join('')}${tk.b.length?' + '+tk.b.map(n=>`<span class="ball b">${n}</span>`).join(''):''}</div>${meta}
+      <div class="btnrow" style="margin-top:6px"><button class="btn small" data-tk="${i}" data-act="load">${T('load')}</button><button class="btn small" data-tk="${i}" data-act="del">${T('del')}</button></div></div>`;
+  }).join('')+`<div class="btnrow" style="margin-top:8px"><button class="btn small" id="btnCopy">${T('copyAll')}</button></div>`;
+}
+const d_len=()=> (S.data[S.game]?S.data[S.game].rows.length:0);
+function copyTickets(){
+  const g=G(); const txt=(S.tickets[S.game]||[]).map(tk=>tk.m.map(pad).join(' ')+(tk.b.length?' + '+tk.b.map(pad).join(' '):'')).join('\n');
+  const done=()=>toast(T('copied'));
+  if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(done,()=>fallbackCopy(txt,done)); else fallbackCopy(txt,done);
+}
+function fallbackCopy(txt,done){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){} ta.remove(); }
+
+/* =====================================================================
+   Stats panels
+   ===================================================================== */
+function renderNums(){
+  const el=$('#p-nums'); if(!V){ el.innerHTML=''; return; }
+  const g=V.g, pool=(!g.same&&S.statPool==='b')?'b':'m', st=statsFor(pool), mx=pool==='m'?V.mainMax:V.bonMax;
+  const cols=[['n',T('num')],['count',T('cnt')],['freq',T('freq')],['cur',T('gapNow')],['avg',T('avgGap')],['maxGap',T('gapMax')],['last',T('lastSeen')],['tag',T('tag')]];
+  let rows=[]; for(let n=1;n<=mx;n++) rows.push(n);
+  const key=S.sort.key, dir=S.sort.dir;
+  const val=n=>key==='n'?n:key==='last'?st.last[n]:key==='avg'?(st.avg[n]==null?1e9:st.avg[n]):key==='tag'?st.tag[n]:st[key][n];
+  rows.sort((a,b)=>(val(a)-val(b))*dir||a-b);
+  const maxC=Math.max(1,...st.count.slice(1));
+  let h='';
+  if(!g.same) h+=`<div class="seg" id="poolSeg" style="margin-bottom:10px"><button data-pl="m" class="${pool==='m'?'on':''}">${g.mName[S.lang]}</button><button data-pl="b" class="${pool==='b'?'on':''}">${g.bName[S.lang]}</button></div>`;
+  h+=`<div class="tblwrap"><table><thead><tr>${cols.map(([k,l])=>`<th data-k="${k}" class="${key===k?'sorted':''}" data-arrow="${dir>0?'▲':'▼'}">${l}</th>`).join('')}</tr></thead><tbody>`;
+  for(const n of rows){
+    if(st.eff[n]===0) continue;
+    const lastTxt=st.last[n]>=0?V.rows[st.last[n]].date:'-';
+    const cur=st.count[n]===0?T('gapFloor',{n:st.cur[n]}):st.cur[n];
+    h+=`<tr data-p="${pool}" data-n="${n}"><td><b>${n}</b></td><td class="barcell"><i style="width:${(100*st.count[n]/maxC).toFixed(0)}%"></i><span>${st.count[n]}</span></td>
+      <td>${(st.freq[n]*100).toFixed(1)}%</td><td>${cur}</td><td>${st.avg[n]==null?'-':st.avg[n].toFixed(1)}</td><td>${st.maxGap[n]}</td><td>${lastTxt}</td>
+      <td>${st.tag[n]===1?`<span class="tag hot">${T('hotT')}</span>`:st.tag[n]===-1?`<span class="tag cold">${T('coldT')}</span>`:''}</td></tr>`;
+  }
+  el.innerHTML=h+'</tbody></table></div>';
+}
+$('#p-nums').addEventListener('click',e=>{
+  const th=e.target.closest('th'); if(th){ const k=th.dataset.k; if(S.sort.key===k) S.sort.dir*=-1; else { S.sort.key=k; S.sort.dir=(k==='n'||k==='last')?1:-1; if(k==='last') S.sort.dir=-1; } renderNums(); return; }
+  const b=e.target.closest('#poolSeg button'); if(b){ S.statPool=b.dataset.pl; renderNums(); return; }
+  const tr=e.target.closest('tbody tr'); if(tr){ const n=+tr.dataset.n, p=tr.dataset.p; if(p==='b'&&V.g.same) return; togglePick(p,n); }
+});
+$('#p-nums').addEventListener('pointerover',e=>{ const tr=e.target.closest('tbody tr'); if(tr&&e.pointerType==='mouse') setExt([{p:tr.dataset.p,n:+tr.dataset.n}]); });
+$('#p-nums').addEventListener('pointerleave',()=>setExt([]));
+
+function hbars(obj,labelFn,keys,total){
+  const max=Math.max(1,...keys.map(k=>obj[k]||0));
+  return keys.map(k=>{ const v=obj[k]||0; return `<div class="hb"><span>${labelFn(k)}</span><span class="t"><i style="width:${(100*v/max).toFixed(1)}%"></i></span><span class="v">${v} · ${(100*v/total).toFixed(1)}%</span></div>`; }).join('');
+}
+function renderDist(){
+  const el=$('#p-dist'); if(!V){ el.innerHTML=''; return; }
+  const M=metrics(), g=V.g, k=g.pickMain, N=M.N, first=V.rows[0].date, lastD=V.rows[N-1].date;
+  const keys=[...Array(k+1).keys()];
+  const lowFn=i=>`${i}${T('lowW')} ${k-i}${T('highW')}`, oddFn=i=>`${i}${T('odd')} ${k-i}${T('even')}`;
+  const repKeys=[...Array(k+1).keys()].filter(i=>(M.rep[i]||0)>0||i<=2), repTot=Math.max(1,M.repN||1);
+  const consKeys=Object.keys(M.cons).map(Number).sort((a,b)=>a-b);
+  const lo=M.sorted[0], hi=M.sorted[N-1], bw=Math.max(1,Math.ceil((hi-lo+1)/12)), bins={}, binKeys=[];
+  for(const s of M.sums){ const b=Math.floor((s-lo)/bw); bins[b]=(bins[b]||0)+1; }
+  for(let b=0;b<=Math.floor((hi-lo)/bw);b++) binKeys.push(b);
+  const zmax=Math.max(...M.zone,0.0001);
+  el.innerHTML=`<div class="cards">
+    <div class="kpi"><b>${N}</b><span>${T('draws')} · ${first} → ${lastD}</span></div>
+    <div class="kpi"><b>${M.avgSum.toFixed(1)}</b><span>${T('avgSum')}（${M.pct(.1)}–${M.pct(.9)}）</span></div>
+    <div class="kpi"><b>${M.avgOdd.toFixed(2)}</b><span>${T('avgOdd')}</span></div>
+    <div class="kpi"><b>${M.avgHigh.toFixed(2)}</b><span>${T('avgHigh')}</span></div>
+    <div class="kpi"><b>${M.avgRep.toFixed(2)}</b><span>${T('avgRep')}</span></div>
+    <div class="kpi"><b>${(100*M.hasCons/N).toFixed(0)}%</b><span>${T('consecRate')}</span></div></div>
+    <div class="dist">
+     <div class="card"><h3>${T('oddEven')}</h3>${hbars(M.odd,oddFn,keys,N)}</div>
+     <div class="card"><h3>${T('lowHigh')}</h3>${hbars(M.low,lowFn,keys,N)}</div>
+     <div class="card"><h3>${T('zones')}</h3>${M.zone.map((z,i)=>`<div class="hb"><span>${i*10+1}–${Math.min(V.mainMax,i*10+10)}</span><span class="t"><i style="width:${(100*z/zmax).toFixed(1)}%"></i></span><span class="v">${z.toFixed(2)}</span></div>`).join('')}</div>
+     <div class="card"><h3>${T('sumDist')}</h3>${hbars(bins,b=>`${lo+b*bw}–${lo+b*bw+bw-1}`,binKeys,N)}</div>
+     <div class="card"><h3>${T('repDist')}</h3>${hbars(M.rep,i=>i,repKeys,repTot)}</div>
+     <div class="card"><h3>${T('consecDist')}</h3>${hbars(M.cons,i=>i,consKeys,N)}</div></div>`;
+}
+function renderPairs(){
+  const el=$('#p-pairs'); if(!V){ el.innerHTML=''; return; }
+  const ps=pairsStats();
+  el.innerHTML=`<h3>${T('pairsTitle')}</h3><p class="lbl" style="margin:0 0 10px">${T('pairHint')}</p><div class="pairs">`+
+    ps.map(x=>`<button class="pair" data-a="${x.a}" data-b="${x.b}"><span><span class="ball">${x.a}</span><span class="ball">${x.b}</span></span><b>${T('pairTimes',{n:x.c})}</b></button>`).join('')+'</div>';
+}
+$('#p-pairs').addEventListener('click',e=>{ const b=e.target.closest('.pair'); if(!b) return; const pk=P(); for(const n of [+b.dataset.a,+b.dataset.b]) pk.sets[pk.active].m.add(n); refreshPick(); needDraw(); toast(T('addedTo',{s:SETS[pk.active]})); });
+$('#p-pairs').addEventListener('pointerover',e=>{ const b=e.target.closest('.pair'); if(b&&e.pointerType==='mouse') setExt([{p:'m',n:+b.dataset.a},{p:'m',n:+b.dataset.b}]); });
+$('#p-pairs').addEventListener('pointerout',e=>{ if(e.target.closest('.pair')) setExt([]); });
+
+function renderPanels(){
+  if(S.tab==='pick') renderPicker(); else if(S.tab==='nums') renderNums(); else if(S.tab==='dist') renderDist(); else renderPairs();
+}
+function renderAll(){
+  recompute(); hideInfo(); renderTop(); buildBlocks(); layout(); renderPanels(); needDraw();
+}
+
+/* =====================================================================
+   Init
+   ===================================================================== */
+(async function init(){
+  const st=lsGet('dc.settings',null);
+  if(st){ for(const k of ['lang','game','period','cell','incBonus','tab','heat']) if(st[k]!==undefined) S[k]=st[k]; if(st.rnd) Object.assign(S.rnd,st.rnd); }
+  if(!GAMES[S.game]) S.game='lotto';
+  S.tickets=lsGet('dc.tickets',{});
+  S.persisted=await DB.open();
+  const saved=await DB.all();
+  for(const gid in saved){ if(GAMES[gid]) try{ S.data[gid]=hydrate(gid,saved[gid]); }catch(e){} }
+  if(!S.data[S.game]){ const first=ORDER.find(id=>S.data[id]); if(first) S.game=first; }
+  renderAll(true);
+  window.__app={S,get V(){return V;},get BL(){return BL;},get L(){return L;},importFiles,GAMES,randomTicket,metrics,pairsStats,togglePick,updateFromRemote,mergeRows};
+  // first visit on the published site: load the online data automatically
+  if(!isLocalFile()&&!Object.keys(S.data).length) updateFromRemote(true);
+})();
+</script>
+</body>
+</html>
