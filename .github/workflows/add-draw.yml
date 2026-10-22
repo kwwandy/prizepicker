@@ -1,0 +1,84 @@
+name: Add draw from issue
+
+# Opening an issue titled "[add-draw] ..." (the page's "Add a draw" button pre-fills it) adds one draw to data/ and republishes the site.
+# Only issues opened by the repository owner are processed.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  add-draw:
+    if: github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '[add-draw]')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Add draw
+        id: add
+        continue-on-error: true
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          RESULT_FILE: ${{ runner.temp }}/result.md
+        run: node scripts/add-draw.mjs
+
+      - name: Commit data
+        if: steps.add.outcome == 'success'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "data: add draw from issue #${ISSUE_NUMBER}"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Reply and close issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RESULT_FILE: ${{ runner.temp }}/result.md
+        run: |
+          if [ -f "$RESULT_FILE" ]; then MSG=$(cat "$RESULT_FILE"); else MSG="❌ The workflow failed before producing a result. See the Actions log."; fi
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$MSG"
+          gh issue close "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY"
+
+      - name: Prepare site
+        if: steps.add.outcome == 'success'
+        run: |
+          mkdir _site
+          cp index.html _site/
+          cp -r data _site/data
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+        if: steps.add.outcome == 'success'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.add.outcome == 'success'
+        with:
+          path: _site
+      - id: deployment
+        if: steps.add.outcome == 'success'
+        uses: actions/deploy-pages@v4
