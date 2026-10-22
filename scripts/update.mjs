@@ -30,7 +30,7 @@ export const GAMES = {
 };
 /* run day (UTC weekday) -> games drawn the day before.
    Lotto Wed+Sat, Set for Life Mon+Thu, EuroMillions Tue+Fri, Powerball Mon+Wed+Sat, Mark Six Tue+Thu+Sat, Thunderball Tue+Wed+Fri+Sat. Monday is not scheduled. */
-export const AUTO = { 0: ['lotto', 'pb', 'mk6', 'tb'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'mk6', 'tb'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl', 'mk6'], 6: ['euro', 'tb'] };
+export const AUTO = { 0: ['lotto', 'pb', 'tb', 'mk6'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'tb', 'mk6'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl', 'mk6'], 6: ['euro', 'tb'] };
 
 /* ---------------------------------------------------------------- helpers */
 export function parseCSV(text) {
@@ -92,6 +92,29 @@ export function parseUkCsv(text, gid) {
   }
   return out;
 }
+/* National Lottery results feed (XML, latest draw only):
+   <draw-results><game type="lotto"><draw><draw-number>3217</draw-number><draw-date>2026-10-21</draw-date>...</draw>
+   <balls><set>L1</set><ball number="1">21</ball>...</balls>...</game></draw-results>
+   Balls are taken in document order (sorted by their number attribute): first mainN are the main numbers, the next bonusN the bonus. */
+export function parseUkXml(text, gid) {
+  const g = GAMES[gid];
+  if (!/<draw-results/i.test(text)) throw new Error('not an XML results feed');
+  const out = [];
+  const games = [...text.matchAll(/<game\b[^>]*>([\s\S]*?)<\/game>/gi)].map((m) => m[1]);
+  for (const body of games.length ? games : [text]) {
+    const date = parseDateAny((body.match(/<draw-date>([^<]+)<\/draw-date>/i) || [])[1]);
+    const dnRaw = (body.match(/<draw-number>(\d+)<\/draw-number>/i) || [])[1];
+    const balls = (body.match(/<balls\b[^>]*>([\s\S]*?)<\/balls>/i) || [])[1] || '';
+    const list = [...balls.matchAll(/<ball\b[^>]*?number="(\d+)"[^>]*>\s*(\d+)\s*<\/ball>/gi)]
+      .map((m) => [parseInt(m[1], 10), parseInt(m[2], 10)]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    if (!date || list.length < g.mainN + g.bonusN) throw new Error(`cannot read draw from XML (date ${date}, ${list.length} balls); game block: ${JSON.stringify(body.slice(0, 1800))}`);
+    out.push({ date, dn: dnRaw ? parseInt(dnRaw, 10) : null,
+      m: list.slice(0, g.mainN).sort((x, y) => x - y), b: list.slice(g.mainN, g.mainN + g.bonusN).sort((x, y) => x - y) });
+  }
+  return out;
+}
+const parseUk = (gid) => (t) => (/^\s*<\?xml|^\s*<draw-results/i.test(t) ? parseUkXml(t, gid) : parseUkCsv(t, gid));
+
 /* New York open data "Lottery Powerball Winning Numbers: Beginning 2010" (Socrata JSON):
    [{"draw_date":"2026-09-30T00:00:00.000","winning_numbers":"04 06 23 33 44 13","multiplier":"2"}, ...] */
 export function parsePbJson(text) {
@@ -125,15 +148,39 @@ export function parseMk6Csv(text) {
   return out;
 }
 
+/* kclm.site (third-party JSON): {"data":[{"issue":"26/112","drawResult":"2,5,7,8,21,29,31","drawTime":"2026-10-20 21:30:00","code":"hk6"}, ...]}
+   The array may be at the top level or nested; the 7 numbers are 6 main + extra. */
+export function parseMk6Json(text) {
+  const j = JSON.parse(text);
+  const find = (v, d = 0) => {
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === 'object' && d < 4) for (const k of Object.keys(v)) { const r = find(v[k], d + 1); if (r) return r; }
+    return null;
+  };
+  const arr = find(j);
+  if (!arr) throw new Error('no array in JSON');
+  const out = [];
+  for (const r of arr) {
+    const date = parseDateAny(r.drawTime || r.draw_time || r.drawDate || r.date);
+    const n = ints(String(r.drawResult || r.result || '').split(/[,\s+]+/).filter(Boolean));
+    if (!date || n.length !== 7) continue;
+    const im = String(r.issue || '').trim().match(/^(\d{4}|\d{2})\s*[\/-]?\s*(\d{1,3})$/);
+    out.push({ date, dn: im ? String(parseInt(im[1], 10) % 100).padStart(2, '0') + '/' + parseInt(im[2], 10) : null,
+      m: n.slice(0, 6).sort((x, y) => x - y), b: [n[6]] });
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- sources, tried in order */
 const NL = 'https://www.national-lottery.co.uk/results/';
 export const SOURCES = {
-  lotto: [{ name: 'national-lottery.co.uk (Lotto CSV)', url: NL + 'lotto/draw-history/csv', parse: (t) => parseUkCsv(t, 'lotto') }],
-  sfl:   [{ name: 'national-lottery.co.uk (Set For Life CSV)', url: NL + 'set-for-life/draw-history/csv', parse: (t) => parseUkCsv(t, 'sfl') }],
-  tb:    [{ name: 'national-lottery.co.uk (Thunderball CSV)', url: NL + 'thunderball/draw-history/csv', parse: (t) => parseUkCsv(t, 'tb') }],
-  euro:  [{ name: 'national-lottery.co.uk (EuroMillions CSV)', url: NL + 'euromillions/draw-history/csv', parse: (t) => parseUkCsv(t, 'euro') }],
+  lotto: [{ name: 'national-lottery.co.uk (Lotto CSV)', url: NL + 'lotto/draw-history/csv', min: 1, parse: parseUk('lotto') }],
+  sfl:   [{ name: 'national-lottery.co.uk (Set For Life CSV)', url: NL + 'set-for-life/draw-history/csv', min: 1, parse: parseUk('sfl') }],
+  tb:    [{ name: 'national-lottery.co.uk (Thunderball CSV)', url: NL + 'thunderball/draw-history/csv', min: 1, parse: parseUk('tb') }],
+  euro:  [{ name: 'national-lottery.co.uk (EuroMillions CSV)', url: NL + 'euromillions/draw-history/csv', min: 1, parse: parseUk('euro') }],
   pb:    [{ name: 'data.ny.gov (Powerball)', url: 'https://data.ny.gov/resource/d6yy-54nr.json?$order=draw_date%20DESC&$limit=5000', parse: parsePbJson }],
-  mk6:   [{ name: 'renavon.com (Mark Six CSV)', url: 'https://renavon.com/data/hkjc/hkjc_marksix_results/download/csv', parse: parseMk6Csv }],
+  mk6:   [{ name: 'renavon.com (Mark Six CSV)', url: 'https://renavon.com/data/hkjc/hkjc_marksix_results/download/csv', parse: parseMk6Csv },
+         { name: 'kclm.site (Mark Six JSON, third party, latest draws only)', url: 'https://kclm.site/api/trial/drawResult?code=hk6&format=json&rows=300', min: 5, strict: true, parse: parseMk6Json }],
 };
 
 /* ---------------------------------------------------------------- validation & merge */
@@ -186,11 +233,16 @@ export async function updateGame(gid, { dry = false, force = false, fetcher = fe
       try { fresh = s.parse(text, gid); }
       catch (e) { throw new Error(`${e.message}\n    first lines of the response: ${JSON.stringify(text.slice(0, 300))}`); }
       const valid = fresh.filter((r) => checkRow(gid, r));
-      if (valid.length < cfg.minRows) throw new Error(`only ${valid.length} valid rows from ${s.name} (expected at least ${cfg.minRows}); first lines: ${JSON.stringify(text.slice(0, 300))}`);
+      if (valid.length < (s.min ?? cfg.minRows)) throw new Error(`only ${valid.length} valid rows from ${s.name} (expected at least ${s.min ?? cfg.minRows}); first lines: ${JSON.stringify(text.slice(0, 300))}`);
       if (valid.length < fresh.length) console.log(`${gid}: ignored ${fresh.length - valid.length} rows that failed validation`);
       const m = mergeInto(curRows, valid);
       if (m.changed > 5 && !force) throw new Error(`${s.name} disagrees with the stored data on ${m.changed} draws, so nothing was written. Check the source, or re-run with force.`);
       if (m.rows.length < curRows.length) throw new Error('merge would shrink the data, refusing');
+      if (s.strict) {
+        const have = new Set(curRows.map((r) => r.date)); const overlap = valid.filter((r) => have.has(r.date)).length;
+        if (overlap < 3) throw new Error(`${s.name}: only ${overlap} draws overlap the stored data, cannot cross-check, nothing written`);
+        if (m.changed > 0) throw new Error(`${s.name}: ${m.changed} draws differ from the stored data, nothing written`);
+      }
       const latest = m.rows[m.rows.length - 1];
       if (m.added + m.changed === 0) { console.log(`${gid}: already up to date (latest ${latest.date}) [${s.name}]`); return { gid, status: 'same', latest: latest.date }; }
       if (!dry) fs.writeFileSync(file, serialise(gid, s.name, m.rows));

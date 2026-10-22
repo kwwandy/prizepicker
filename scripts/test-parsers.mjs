@@ -1,6 +1,6 @@
 // node scripts/test-parsers.mjs  — checks the parsers, validation and merge with small made-up samples (no network).
 import assert from 'node:assert/strict';
-import { parseUkCsv, parsePbJson, parseMk6Csv, parseDateAny, checkRow, mergeInto, AUTO } from './update.mjs';
+import { parseUkXml, parseUkCsv, parsePbJson, parseMk6Csv, parseMk6Json, parseDateAny, checkRow, mergeInto, AUTO } from './update.mjs';
 
 assert.equal(parseDateAny('2026-09-30T00:00:00.000'), '2026-09-30');
 assert.equal(parseDateAny('30-Sep-2026'), '2026-09-30');
@@ -19,6 +19,10 @@ assert.deepEqual(e[0].m, [1, 22, 33, 44, 50]); assert.deepEqual(e[0].b, [2, 12])
 
 const tb = 'DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Thunderball,DrawNumber\n17-Oct-2026,28,9,18,23,27,1,3993\n';
 assert.ok(checkRow('tb', parseUkCsv(tb, 'tb')[0]));
+
+const xml = '<?xml version="1.0"?><draw-results><game type="lotto"><draw><draw-number>3217</draw-number><draw-date>2026-10-21</draw-date></draw><balls><set>L1</set><ball number="1">21</ball><ball number="2">28</ball><ball number="3">3</ball><ball number="4">40</ball><ball number="5">9</ball><ball number="6">12</ball><ball number="7">18</ball></balls></game></draw-results>';
+const x = parseUkXml(xml, 'lotto');
+assert.deepEqual(x[0], { date: '2026-10-21', dn: 3217, m: [3, 9, 12, 21, 28, 40], b: [18] });
 
 const sfl = 'DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Life Ball,DrawNumber\n2026-10-01,1,2,3,4,47,10,500\n';
 assert.ok(checkRow('sfl', parseUkCsv(sfl, 'sfl')[0]));
@@ -39,3 +43,7 @@ assert.equal(mg.added, 1); assert.equal(mg.changed, 0); assert.equal(mg.rows[0].
 
 assert.deepEqual(AUTO[1], []);
 console.log('all parser tests passed');
+
+const kj = parseMk6Json(JSON.stringify({ code: 0, data: { list: [{ issue: '26/112', drawResult: '31,2,5,7,8,21,29', drawTime: '2026-10-20 21:30:00', code: 'hk6' }, { issue: 'x', drawResult: '1,2' }] } }));
+assert.equal(kj.length, 1); assert.deepEqual(kj[0], { date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 31], b: [29] }); assert.ok(checkRow('mk6', kj[0]));
+console.log('mk6 json parser ok');
