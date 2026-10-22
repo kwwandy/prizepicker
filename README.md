@@ -18,12 +18,14 @@
 只更新「前一日有開獎」嘅遊戲，星期一唔跑：
 | 跑嘅日子 | 更新 |
 |---|---|
-| 日 | Lotto、Powerball、六合彩、Thunderball |
+| 日 | Lotto、Powerball、Thunderball |
 | 二 | Set for Life、Powerball |
-| 三 | EuroMillions、六合彩、Thunderball |
+| 三 | EuroMillions、Thunderball |
 | 四 | Lotto、Powerball、Thunderball |
-| 五 | Set for Life、六合彩 |
+| 五 | Set for Life |
 | 六 | EuroMillions、Thunderball |
+
+**六合彩唔會自動更新**（暫時冇 GitHub 連得到嘅來源），請用下面「手動新增一期」，或者匯入 Renavon CSV。想試自動來源：Run workflow，games 填 `mk6`。
 
 ## 手動更新
 - GitHub：Actions → Run workflow，games 可填 `all` 或 `lotto,tb`。
