@@ -1,9 +1,9 @@
-# 開獎分佈圖 + 選號器
+# PrizePicker
 
 單一 `index.html`，支援英國 Lotto / Set for Life / Thunderball / EuroMillions、美國 Powerball、香港六合彩。
 
 ## 資料夾內容（全部可以公開）
-- `index.html`　網頁本體
+- `index.html`　網頁本體；`manifest.webmanifest`、`*.png`、`favicon.svg`　書籤／主畫面圖示
 - `data/*.json`　只有「日期、期數、開出號碼」，冇獎金、冇投注額、冇個人資料
 - `scripts/update.mjs`　更新資料用嘅程式；`scripts/add-draw.mjs`　處理手動新增嘅 Issue；`scripts/test-parsers.mjs`　解析測試（`node scripts/test-parsers.mjs`）
 - `.github/workflows/pages.yml`　自動更新 + 發佈
@@ -32,7 +32,7 @@
 - 網頁「更新資料」掣：只係重新讀取已發佈嘅 data，唔會去外面抓。想即刻抓新資料，要先喺 GitHub 手動 Run workflow（網頁有連結）。
 
 ## 手動新增一期（所有裝置都見到）
-網頁頂部「新增一期」→ 揀遊戲、日期、點號碼 →「提交到 GitHub」。會開一個已填好嘅 GitHub Issue，撳「Submit new issue」。
+網頁頂部「新增(Admin)」→ 揀遊戲、日期、點號碼 →「提交到 GitHub」。會開一個已填好嘅 GitHub Issue，撳「Submit new issue」。
 `.github/workflows/add-draw.yml` 會驗證、寫入 `data/`、重新發佈，再喺 Issue 回覆結果並關閉（1–2 分鐘）。之後網頁撳「更新資料」。
 - 只處理 repo 擁有者開嘅、標題以 `[add-draw]` 開頭嘅 Issue。
 - 同日已有不同號碼會拒絕，除非勾選「覆蓋」（Issue 內 `force: yes`）。
