@@ -1,0 +1,85 @@
+name: Update data and deploy
+
+# 1) Every day except Monday at 19:30 UTC: fetch the games that were drawn the day before, then publish the site.
+# 2) Manual run: Actions tab -> "Update data and deploy" -> Run workflow (choose games, or "all").
+# 3) Any push to main publishes the site (no data fetch).
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 19 * * 0,2,3,4,5,6'
+  workflow_dispatch:
+    inputs:
+      games:
+        description: 'auto, all, or a comma list such as lotto,euro,sfl,tb,pb,mk6'
+        default: 'all'
+        required: true
+      force:
+        description: 'Accept a source that disagrees with stored data (use only if you checked it)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Update data
+        id: upd
+        if: github.event_name != 'push'
+        continue-on-error: true
+        env:
+          GAMES: ${{ github.event.inputs.games || 'auto' }}
+          FORCE: ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+        run: node scripts/update.mjs --games "$GAMES" $FORCE
+
+      - name: Commit data
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "data: update $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Prepare site
+        run: |
+          mkdir _site
+          cp index.html _site/
+          cp -r data _site/data
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      # The site is always published with whatever data succeeded; this step makes the run show red so GitHub emails you.
+      - name: Report failed update
+        if: steps.upd.outcome == 'failure'
+        run: |
+          echo "One or more games failed to update. See the 'Update data' step."
+          exit 1
