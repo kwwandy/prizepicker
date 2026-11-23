@@ -553,7 +553,13 @@ async function updateFromRemote(silent){
       const j=await res.json();
       const rows=(j.rows||[]).map(a=>({date:a[0],dn:a[1],m:a[2],b:a[3]})).filter(r=>validRow(g,r));
       if(!rows.length) throw new Error('no rows');
-      const old=S.data[gid], mg=mergeRows(g,old?old.rows:[],rows);
+      const old=S.data[gid];
+      /* the online file is the source of truth: drop local rows inside its date range that it does not have (wrong entries it has since corrected),
+         and local rows after its last draw that repeat the numbers of another draw (double entries) */
+      let oldRows=old?old.rows:[]; const rd=new Set(rows.map(r=>r.date)), first=rows[0].date, last=rows[rows.length-1].date, key=r=>r.m.join()+'|'+r.b.join();
+      const seen=new Set(rows.slice(-400).map(key)); let dropped=0;
+      oldRows=oldRows.filter(r=>{ const bad=(r.date>=first&&r.date<=last&&!rd.has(r.date))||(r.date>last&&seen.has(key(r))); if(bad) dropped++; return !bad; });
+      const mg=mergeRows(g,oldRows,rows); if(dropped) mg.changed+=dropped;
       S.data[gid]={file:old?old.file:'online',at:Date.now(),rat:Date.parse(j.updated)||null,rows:mg.rows};
       if(!(await DB.put(gid,pack(S.data[gid])))&&!silent) msgs.push(T('storeFail'));
       okAny=true;
