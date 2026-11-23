@@ -1,6 +1,6 @@
 // node scripts/test-parsers.mjs  — checks the parsers, validation and merge with small made-up samples (no network).
 import assert from 'node:assert/strict';
-import { parseUkXml, parseUkCsv, parsePbJson, parseMk6Csv, parseMk6Json, parseDateAny, checkRow, mergeInto, AUTO } from './update.mjs';
+import { parseUkXml, parseUkCsv, parsePbJson, parseMk6Csv, parseHkjc, parseDateAny, checkRow, mergeInto, AUTO } from './update.mjs';
 
 assert.equal(parseDateAny('2026-09-30T00:00:00.000'), '2026-09-30');
 assert.equal(parseDateAny('30-Sep-2026'), '2026-09-30');
@@ -46,21 +46,55 @@ assert.equal(mg.added, 1); assert.equal(mg.changed, 0); assert.equal(mg.rows[0].
 assert.deepEqual(AUTO[1], []);
 console.log('all parser tests passed');
 
-const kj = parseMk6Json(JSON.stringify({ code: 0, data: { list: [{ issue: '26/112', drawResult: '31,2,5,7,8,21,29', drawTime: '2026-10-20 21:30:00', code: 'hk6' }, { issue: 'x', drawResult: '1,2' }] } }));
-assert.equal(kj.length, 1); assert.deepEqual(kj[0], { date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 31], b: [29] }); assert.ok(checkRow('mk6', kj[0]));
-console.log('mk6 json parser ok');
+const hk = JSON.stringify({ data: { lotteryDraws: [
+  { year: '2026', no: 123, drawDate: '2026-11-19+08:00', status: 'Result', drawResult: { drawnNo: [45, 12, 18, 32, 47, 49], xDrawnNo: 41 } },
+  { year: '2026', no: 124, drawDate: '2026-11-21+08:00', status: 'Open', drawResult: null },
+  { year: '2026', no: 125, drawDate: '2026-11-24+08:00', drawResult: { drawnNo: [], xDrawnNo: null } }] } });
+const hr = parseHkjc(hk);
+assert.equal(hr.length, 1); assert.deepEqual(hr[0], { date: '2026-11-19', dn: '26/123', m: [12, 18, 32, 45, 47, 49], b: [41] }); assert.ok(checkRow('mk6', hr[0]));
+assert.throws(() => parseHkjc('{"errors":[{"message":"bad"}]}'));
+assert.deepEqual(AUTO[3].includes('mk6') && AUTO[5].includes('mk6') && AUTO[0].includes('mk6'), true);
+console.log('hkjc parser ok');
 
 import { parseIssue, applyDraw } from './add-draw.mjs';
 const rq = parseIssue('game: mk6\ndate: 2026-10-22\ndraw: 26/113\nmain: 31 2 5 7 8 21\nbonus: 29\nforce: no\n');
-assert.deepEqual(rq, { game: 'mk6', date: '2026-10-22', draw: '26/113', m: [2, 5, 7, 8, 21, 31], b: [29], force: false });
-const base = [{ date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 29], b: [31] }];
-const now = new Date('2026-10-22T10:00:00Z');
-let r2 = applyDraw(rq, base, now); assert.ok(r2.ok && r2.rows.length === 2 && r2.rows[1].dn === '26/113');
-assert.ok(!applyDraw({ ...rq, date: '2026-12-01' }, base, now).ok, 'future date');
-assert.ok(!applyDraw({ ...rq, m: [1, 1, 2, 3, 4, 5] }, base, now).ok, 'duplicate numbers');
-assert.ok(!applyDraw({ ...rq, game: 'xx' }, base, now).ok, 'unknown game');
-assert.ok(!applyDraw({ ...rq, date: '2026-10-20' }, base, now).ok, 'existing different date needs force');
-assert.ok(applyDraw({ ...rq, date: '2026-10-20', force: true }, base, now).ok, 'force overwrites');
-assert.ok(applyDraw({ ...rq, date: '2026-10-20', m: base[0].m, b: base[0].b, draw: '' }, base, now).noChange, 'same data = no change');
-assert.ok(!applyDraw({ ...rq, draw: 'abc' }, base, now).ok, 'bad draw label');
+assert.deepEqual(rq, { action: 'add', game: 'mk6', date: '2026-10-22', draw: '26/113', m: [2, 5, 7, 8, 21, 31], b: [29], force: false, special: false });
+const base = [
+  { date: '2026-10-17', dn: '26/111', m: [3, 13, 27, 29, 30, 40], b: [9] },
+  { date: '2026-10-20', dn: '26/112', m: [2, 5, 7, 8, 21, 29], b: [31] }];
+const now = new Date('2026-10-28T10:00:00Z');
+const A = (o, rows = base) => applyDraw({ ...rq, ...o }, rows, now);
+let r2 = A({}); assert.ok(r2.ok && r2.rows.length === 3 && r2.rows[2].dn === '26/113');
+assert.ok(!A({ date: '2026-12-01' }).ok, 'future date');
+assert.ok(!A({ m: [1, 1, 2, 3, 4, 5] }).ok, 'duplicate numbers in one draw');
+assert.ok(!A({ game: 'xx' }).ok, 'unknown game');
+assert.ok(!A({ date: '2026-10-20' }).ok, 'existing different date needs force');
+assert.ok(A({ date: '2026-10-20', force: true, draw: '' }).ok, 'force overwrites');
+assert.ok(A({ date: '2026-10-20', m: base[1].m, b: base[1].b, draw: '' }).noChange, 'same data = no change');
+assert.ok(!A({ draw: 'abc' }).ok, 'bad draw label');
+/* the mistakes that really happened */
+assert.ok(/Mon/.test(A({ date: '2026-10-26' }).message) && !A({ date: '2026-10-26' }).ok, 'Monday is not a Mark Six day');
+assert.ok(A({ date: '2026-10-26', special: true, draw: '26/113' }).ok, 'special draw on another weekday is allowed');
+assert.ok(!A({ draw: '26/115' }).ok, 'draw number skips 113/114');
+assert.ok(!A({ draw: '26/112' }).ok, 'draw number already used');
+assert.ok(!A({ m: base[1].m, b: base[1].b }).ok, 'same numbers as an earlier draw = duplicate entry');
+assert.ok(A({ draw: '26/115', force: true }).ok, 'force skips the sequence check');
+assert.ok(A({ draw: '' }).ok, 'draw number optional');
+/* new year restarts at 1 */
+const ny = [{ date: '2026-12-29', dn: '26/145', m: [1, 2, 3, 4, 5, 6], b: [7] }];
+
+const t2 = new Date('2027-01-03T00:00:00Z');
+assert.ok(applyDraw({ ...rq, date: '2027-01-02', draw: '27/1', m: [8, 9, 10, 11, 12, 13], b: [14] }, ny, t2).ok, 'new year 27/1');
+assert.ok(!applyDraw({ ...rq, date: '2027-01-02', draw: '27/2', m: [8, 9, 10, 11, 12, 13], b: [14] }, ny, t2).ok, 'new year must start at 27/1');
+/* gap filling between two stored draws */
+const gap = [{ date: '2026-10-17', dn: '26/111', m: [3, 13, 27, 29, 30, 40], b: [9] }, { date: '2026-10-22', dn: '26/114', m: [4, 11, 12, 16, 38, 48], b: [5] }];
+assert.ok(applyDraw({ ...rq, date: '2026-10-20', draw: '26/112', m: [2, 5, 7, 8, 21, 29], b: [31] }, gap, now).ok, 'fill a gap');
+assert.ok(!applyDraw({ ...rq, date: '2026-10-20', draw: '26/115', m: [2, 5, 7, 8, 21, 29], b: [31] }, gap, now).ok, 'gap fill number after next');
+/* delete */
+const d = applyDraw({ ...rq, action: 'delete', date: '2026-10-20' }, base, now); assert.ok(d.ok && d.rows.length === 1);
+assert.ok(!applyDraw({ ...rq, action: 'delete', date: '2026-10-21' }, base, now).ok, 'delete missing date');
+assert.ok(!applyDraw({ ...rq, action: 'remove' }, base, now).ok, 'unknown action');
+/* every other game: weekday guard */
+assert.ok(!applyDraw({ game: 'lotto', date: '2026-10-21', draw: '', m: [1, 2, 3, 4, 5, 6], b: [7], action: 'add' }, [], now).ok === false, 'Wed Lotto ok');
+assert.ok(!applyDraw({ game: 'lotto', date: '2026-10-22', draw: '', m: [1, 2, 3, 4, 5, 6], b: [7], action: 'add' }, [], now).ok, 'Thu Lotto rejected');
 console.log('add-draw tests ok');

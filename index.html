@@ -184,6 +184,16 @@ tr:hover td{background:var(--hl)}
   max-width:92vw;display:none;font-size:13.5px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 
 /* add-draw dialog */
+#addBox .pv{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:6px 0;font-size:12px;background:var(--bg)}
+#addBox .pv div{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0}
+#addBox .pv b{min-width:150px;font-weight:600;color:var(--muted)}
+#addBox .pv i{font-style:normal;min-width:22px;text-align:center;border-radius:3px;padding:0 3px;color:#fff;background:var(--main);font-weight:700}
+#addBox .pv i.x{background:#000;outline:1px solid #888}
+#addBox .warn{color:var(--red-text,#d33);font-size:13px;margin:6px 0}
+#addBox details{margin-top:12px;font-size:13px}
+#addBox summary{cursor:pointer;color:var(--muted)}
+.games button.today::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5b800;margin-left:6px;vertical-align:middle}
+
 #addMask{position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:16px}
 #addMask.on{display:flex}
 #addBox{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(680px,100%);margin:auto 0}
@@ -309,6 +319,7 @@ const I18N = {
   askUrl:'請輸入你網站嘅網址（例如 https://你的用戶名.github.io/repo名/）。本機版會由呢個網站讀取最新資料：',
   updNew:'{g}：新增 {n} 期（最新 {d}）', updSame:'{g}：已經係最新', updFail:'{g}：未能更新（{e}）',
   addBtn:'新增(Admin)', addTitle:'手動新增一期開獎', addGame:'遊戲', addDate:'開獎日期', addDraw:'期數（可留空）', addMain:'主號', addBonus:'特別號', addSel:'已選', addForce:'覆蓋已有同日資料（只用於更正）', addSubmit:'提交到 GitHub', addCancel:'取消', addHint:'撳「提交」後會開 GitHub 嘅新 Issue 頁（內容已填好），再撳「Submit new issue」。約 1–2 分鐘後完成，之後撳「更新資料」就見到。只有 repo 擁有者提交先會被接受。', noRepo:'未能知道 GitHub repo。請先設定網站網址（https://用戶名.github.io/repo名/）',
+  addRecent:'最近三期（對照用）', addWarnDay:'星期{d}通常冇攪珠。如果係特別攪珠日，請剔選下面「特別攪珠日」。', addSpecial:'特別攪珠日', addWarnDup:'呢組號碼同 {d} 嗰期一模一樣，好可能係重複輸入。', addWarnClash:'{d} 已經有唔同號碼嘅記錄，提交會覆蓋佢。', addWarnSeq:'期數 {a} 唔係上一期嘅下一期（應該係 {b}）。', addWarnUsed:'期數 {a} 已經被 {d} 使用。', addConfirm:'我已核對清楚，仍然提交', addDelTitle:'刪除一期（輸入錯誤）', addDelSubmit:'提交刪除', addDelAsk:'確定要提交刪除 {d} 呢一期？', todayTip:'今日推介',
   lastDraw:'最新一期', siteAt:'網站資料更新於', importedAt:'資料匯入於', noRemote:'未設定網站網址，未能讀取網上資料',
   imported:'已匯入 {g}：{n} 期（{a} 至 {b}）', unknown:'認唔出 {f} 係邊款遊戲，已略過', noRows:'{f} 入面冇有效資料', storeFail:'呢個瀏覽器唔支援儲存，今次資料只會留喺記憶體',
   notice:'提示：每期開獎都係獨立隨機事件，分佈圖、冷熱號同統計都唔可以預測下一期結果，只係方便睇歷史同揀號。',
@@ -345,6 +356,7 @@ const I18N = {
   askUrl:'Enter your site address (e.g. https://your-name.github.io/repo-name/). This local copy will read the latest data from it:',
   updNew:'{g}: {n} new draws (latest {d})', updSame:'{g}: already up to date', updFail:'{g}: could not update ({e})',
   addBtn:'Add (Admin)', addTitle:'Add one draw by hand', addGame:'Game', addDate:'Draw date', addDraw:'Draw no. (optional)', addMain:'Main', addBonus:'Bonus', addSel:'Selected', addForce:'Overwrite an existing draw on that date (corrections only)', addSubmit:'Submit to GitHub', addCancel:'Cancel', addHint:'This opens a pre-filled GitHub issue; press "Submit new issue". It is processed in 1–2 minutes, then press "Update data". Only the repo owner\'s submissions are accepted.', noRepo:'Cannot tell the GitHub repo. Set the site address first (https://user.github.io/repo/)',
+  addRecent:'Last three draws (to compare)', addWarnDay:'{d} is not a regular draw day. If this really was a special draw, tick "Special draw day" below.', addSpecial:'Special draw day', addWarnDup:'These exact numbers were drawn on {d}, so this is probably a duplicate entry.', addWarnClash:'{d} already has different numbers; submitting will overwrite them.', addWarnSeq:'Draw no. {a} does not follow the previous draw (expected {b}).', addWarnUsed:'Draw no. {a} is already used by {d}.', addConfirm:'I have checked, submit anyway', addDelTitle:'Delete a draw (entered by mistake)', addDelSubmit:'Submit deletion', addDelAsk:'Submit deletion of the draw on {d}?', todayTip:'Suggested today',
   lastDraw:'Latest draw', siteAt:'site data updated', importedAt:'data imported', noRemote:'No site address set, cannot read online data',
   imported:'Imported {g}: {n} draws ({a} to {b})', unknown:'Could not tell which game {f} is, skipped', noRows:'No valid rows in {f}', storeFail:'This browser cannot store data; it will only be kept in memory this time',
   notice:'Note: every draw is an independent random event. Charts, hot/cold numbers and stats cannot predict the next draw; they only help you browse history and pick.',
@@ -551,7 +563,8 @@ async function updateFromRemote(silent){
   }
   updating=false; btn.disabled=false;
   if(!silent||okAny) toast(msgs.join('\n'),7000);
-  if(!S.data[S.game]&&okAny) S.game=ORDER.find(id=>S.data[id])||S.game;
+  if(okAny&&(S.firstLoad||!S.data[S.game])) S.game=S.data[S.autoGame]?S.autoGame:(ORDER.find(id=>S.data[id])||S.game);
+  S.firstLoad=false;
   renderAll();
 }
 function askBase(){
@@ -563,6 +576,21 @@ function askBase(){
 const fmtAt=ms=>{ const d=new Date(ms), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); };
 
 
+
+/* regular draw weekdays (0=Sun); Powerball is the US date, Mark Six the Hong Kong date */
+const DAYS={lotto:[3,6],sfl:[1,4],euro:[2,5],pb:[1,3,6],tb:[2,3,5,6],mk6:[2,4,6]};
+const WDN={zh:['日','一','二','三','四','五','六'],en:['Sun','Mon','Tue','Wed','Thu','Fri','Sat']};
+/* which game to show when the page opens: Mon Set for Life, Tue EuroMillions, Wed UK Lotto, Thu Mark Six, Fri EuroMillions,
+   Sat UK Lotto, Sun Set for Life (next draw: Monday); Powerball from 20:00 on Mon/Wed/Sat (those evenings' UK draws have closed) */
+function autoGame(now){
+  now=now||new Date(); const d=now.getDay(), late=now.getHours()>=20;
+  if(d===1) return late?'pb':'sfl';
+  if(d===2||d===5) return 'euro';
+  if(d===3||d===6) return late?'pb':'lotto';
+  if(d===4) return 'mk6';
+  return 'sfl';
+}
+
 /* =====================================================================
    Add one draw by hand: pre-filled GitHub issue, processed by .github/workflows/add-draw.yml
    ===================================================================== */
@@ -572,8 +600,18 @@ function repoInfo(){
     const user=u.hostname.split('.')[0]; return {user,repo:u.pathname.split('/').filter(Boolean)[0]||(user+'.github.io')};
   }catch(e){ return null; }
 }
-const A={game:'lotto',date:'',draw:'',m:new Set(),b:new Set(),force:false,drawTouched:false};
-const todayStr=()=>{ const d=new Date(), p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); };
+const A={game:'lotto',date:'',draw:'',m:new Set(),b:new Set(),force:false,special:false};
+const pad2=n=>String(n).padStart(2,'0');
+const dstr=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+const todayStr=()=>dstr(new Date());
+/* the first regular draw day after the newest stored draw (up to today); if nothing is missing, the latest regular draw day */
+function defaultDate(gid){
+  const d=S.data[gid], last=d&&d.rows.length?d.rows[d.rows.length-1].date:null, days=DAYS[gid]||[];
+  const today=new Date(); today.setHours(12,0,0,0);
+  if(last){ const x=new Date(last+'T12:00:00'); for(let i=0;i<400;i++){ x.setDate(x.getDate()+1); if(x>today) break; if(days.includes(x.getDay())) return dstr(x); } }
+  const y=new Date(today); for(let i=0;i<8;i++){ if(days.includes(y.getDay())) return dstr(y); y.setDate(y.getDate()-1); }
+  return dstr(today);
+}
 function addPool(){
   const g=GAMES[A.game], d=S.data[A.game], r=d&&d.rows[d.rows.length-1];
   const mx=r?r.mx:g.mainEras[g.mainEras.length-1][1], bx=g.same?mx:(r?r.bx:g.bonusEras[g.bonusEras.length-1][1]);
@@ -586,48 +624,85 @@ function suggestDraw(){
   const yy=(A.date||todayStr()).slice(2,4);
   return yy+'/'+(yy===m[1]?(+m[2]+1):1);
 }
+/* mistakes that really happened: non-draw weekday, same numbers entered twice, draw number out of sequence */
+function addProblems(){
+  const g=GAMES[A.game], d=S.data[A.game], rows=d?d.rows:[], out={day:'',other:[]};
+  if(A.date){ const wd=new Date(A.date+'T12:00:00').getDay(); if(!DAYS[A.game].includes(wd)) out.day=T('addWarnDay',{d:WDN[S.lang][wd]}); }
+  const m=[...A.m].sort((x,y)=>x-y), b=[...A.b].sort((x,y)=>x-y);
+  if(m.length===g.mainN&&b.length===g.bonusN){
+    const dup=rows.slice(-400).find(r=>r.date!==A.date&&r.m.join()===m.join()&&r.b.join()===b.join());
+    if(dup) out.other.push(T('addWarnDup',{d:dup.date}));
+    const same=rows.find(r=>r.date===A.date); if(same&&(same.m.join()!==m.join()||same.b.join()!==b.join())) out.other.push(T('addWarnClash',{d:A.date}));
+  }
+  const dn=(A.draw||'').trim(), last=rows[rows.length-1];
+  if(dn){
+    const used=rows.find(r=>r.date!==A.date&&String(r.dn)===dn); if(used) out.other.push(T('addWarnUsed',{a:dn,d:used.date}));
+    else if(last&&A.date>last.date){ const exp=suggestDraw(); if(exp&&dn!==exp) out.other.push(T('addWarnSeq',{a:dn,b:exp})); }
+  }
+  return out;
+}
+function recentHtml(){
+  const d=S.data[A.game]; if(!d||!d.rows.length) return '';
+  return '<div class="pv"><div><b>'+T('addRecent')+'</b></div>'+d.rows.slice(-3).reverse().map(r=>'<div><b>'+r.date+(r.dn!=null?'（'+r.dn+'）':'')+'</b>'+r.m.map(n=>'<i>'+n+'</i>').join('')+r.b.map(n=>'<i class="x">'+n+'</i>').join('')+'</div>').join('')+'</div>';
+}
 function renderAdd(){
-  const g=GAMES[A.game], {mx,bx}=addPool(), L=S.lang;
+  const g=GAMES[A.game], {mx,bx}=addPool(), L=S.lang, pr=addProblems();
   const grid=(set,max,cls,pool)=>{ let h='<div class="ng">'; for(let n=1;n<=max;n++){ const sel=set.has(n), other=g.same&&(pool==='m'?A.b.has(n):A.m.has(n)); h+=`<button type="button" class="num ${cls} ${sel?'sel':''} ${other?'dis':''}" data-p="${pool}" data-n="${n}">${n}</button>`; } return h+'</div>'; };
   const okM=A.m.size===g.mainN, okB=A.b.size===g.bonusN;
+  const ready=okM&&okB&&A.date&&(!pr.day||A.special)&&(!pr.other.length||A.force);
+  const rows=(S.data[A.game]?S.data[A.game].rows:[]).slice(-12).reverse();
   $('#addBox').innerHTML=`<h2>${T('addTitle')}</h2>
   <div class="row">
     <label class="f">${T('addGame')}<select id="adG">${ORDER.map(id=>`<option value="${id}" ${id===A.game?'selected':''}>${esc(gname(GAMES[id]))}</option>`).join('')}</select></label>
     <label class="f">${T('addDate')}<input type="date" id="adD" value="${A.date}"></label>
     <label class="f">${T('addDraw')}<input type="text" id="adN" value="${esc(A.draw)}" placeholder="${esc(suggestDraw())}" inputmode="text" size="10"></label>
   </div>
+  ${recentHtml()}
   <div class="cnt ${okM?'ok':''}">${g.mName[L]} 1–${mx}　${T('addSel')} ${A.m.size}/${g.mainN}</div>${grid(A.m,mx,'mm','m')}
   <div class="cnt ${okB?'ok':''}">${g.bName[L]} 1–${bx}　${T('addSel')} ${A.b.size}/${g.bonusN}</div>${grid(A.b,bx,'bb','b')}
-  <label class="chk"><input type="checkbox" id="adF" ${A.force?'checked':''}> ${T('addForce')}</label>
+  ${pr.day?`<div class="warn">${pr.day}</div><label class="chk"><input type="checkbox" id="adS" ${A.special?'checked':''}> ${T('addSpecial')}</label>`:''}
+  ${pr.other.map(w=>`<div class="warn">${w}</div>`).join('')}
+  ${pr.other.length?`<label class="chk"><input type="checkbox" id="adF" ${A.force?'checked':''}> ${T('addConfirm')}</label>`:''}
   <p class="hint">${T('addHint')}</p>
-  <div class="btnrow"><button class="btn" id="adCancel">${T('addCancel')}</button><button class="btn primary" id="adSubmit" ${okM&&okB&&A.date?'':'disabled'}>${T('addSubmit')}</button></div>`;
+  <div class="btnrow"><button class="btn" id="adCancel">${T('addCancel')}</button><button class="btn primary" id="adSubmit" ${ready?'':'disabled'}>${T('addSubmit')}</button></div>
+  <details><summary>${T('addDelTitle')}</summary><div class="row">
+    <select id="adDelD">${rows.map(r=>`<option value="${r.date}">${r.date}${r.dn!=null?' ('+r.dn+')':''}　${r.m.join(' ')} + ${r.b.join(' ')}</option>`).join('')}</select>
+    <button class="btn" id="adDel">${T('addDelSubmit')}</button></div></details>`;
 }
 function openAdd(){
   if(!repoInfo()){ if(isLocalFile()&&askBase()&&repoInfo()){} else { toast(T('noRepo'),6000); return; } }
-  A.game=GAMES[S.game]?S.game:'lotto'; A.date=todayStr(); A.m.clear(); A.b.clear(); A.force=false; A.draw=''; 
+  A.game=GAMES[S.game]?S.game:'lotto'; A.date=defaultDate(A.game); A.m.clear(); A.b.clear(); A.force=false; A.special=false; A.draw='';
   A.draw=suggestDraw(); renderAdd(); $('#addMask').classList.add('on');
 }
 function closeAdd(){ $('#addMask').classList.remove('on'); }
 function submitAdd(){
   const g=GAMES[A.game], ri=repoInfo(); if(!ri) return;
-  const body=['game: '+A.game,'date: '+A.date,'draw: '+(A.draw||'').trim(),'main: '+[...A.m].sort((x,y)=>x-y).join(' '),'bonus: '+[...A.b].sort((x,y)=>x-y).join(' '),'force: '+(A.force?'yes':'no')].join('\n');
+  const body=['game: '+A.game,'date: '+A.date,'draw: '+(A.draw||'').trim(),'main: '+[...A.m].sort((x,y)=>x-y).join(' '),'bonus: '+[...A.b].sort((x,y)=>x-y).join(' '),'special: '+(A.special?'yes':'no'),'force: '+(A.force?'yes':'no')].join('\n');
   const url='https://github.com/'+ri.user+'/'+ri.repo+'/issues/new?title='+encodeURIComponent('[add-draw] '+A.game+' '+A.date)+'&body='+encodeURIComponent(body);
   window.open(url,'_blank','noopener'); closeAdd();
+}
+function submitDelete(date){
+  const ri=repoInfo(); if(!ri||!date) return;
+  if(!confirm(T('addDelAsk',{d:date}))) return;
+  const body=['action: delete','game: '+A.game,'date: '+date].join('\n');
+  window.open('https://github.com/'+ri.user+'/'+ri.repo+'/issues/new?title='+encodeURIComponent('[add-draw] delete '+A.game+' '+date)+'&body='+encodeURIComponent(body),'_blank','noopener'); closeAdd();
 }
 $('#btnAdd').addEventListener('click',openAdd);
 $('#addMask').addEventListener('click',e=>{
   if(e.target.id==='addMask'||e.target.id==='adCancel'){ closeAdd(); return; }
   if(e.target.id==='adSubmit'){ submitAdd(); return; }
+  if(e.target.id==='adDel'){ submitDelete($('#adDelD').value); return; }
   const n=e.target.closest('.num'); if(!n) return;
   const g=GAMES[A.game], v=+n.dataset.n, set=n.dataset.p==='m'?A.m:A.b, other=n.dataset.p==='m'?A.b:A.m, cap=n.dataset.p==='m'?g.mainN:g.bonusN;
   if(set.has(v)) set.delete(v); else if(!(g.same&&other.has(v))&&set.size<cap) set.add(v);
-  renderAdd();
+  A.force=false; renderAdd();
 });
 $('#addMask').addEventListener('change',e=>{
-  if(e.target.id==='adG'){ A.game=e.target.value; A.m.clear(); A.b.clear(); A.draw=suggestDraw(); renderAdd(); }
-  else if(e.target.id==='adD'){ A.date=e.target.value; A.draw=suggestDraw(); renderAdd(); }
-  else if(e.target.id==='adN'){ A.draw=e.target.value; }
-  else if(e.target.id==='adF'){ A.force=e.target.checked; }
+  if(e.target.id==='adG'){ A.game=e.target.value; A.m.clear(); A.b.clear(); A.force=false; A.special=false; A.date=defaultDate(A.game); A.draw=suggestDraw(); renderAdd(); }
+  else if(e.target.id==='adD'){ A.date=e.target.value; A.force=false; A.special=false; A.draw=suggestDraw(); renderAdd(); }
+  else if(e.target.id==='adN'){ A.draw=e.target.value; A.force=false; renderAdd(); }
+  else if(e.target.id==='adF'){ A.force=e.target.checked; renderAdd(); }
+  else if(e.target.id==='adS'){ A.special=e.target.checked; renderAdd(); }
 });
 $('#addMask').addEventListener('input',e=>{ if(e.target.id==='adN') A.draw=e.target.value; });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAdd(); });
@@ -1024,7 +1099,7 @@ function renderTop(){
   $('#btnLang').textContent=S.lang==='zh'?'EN':'繁';
   $('#btnImport').textContent=T('import'); $('#btnClear').textContent=T('clear');
   $('#games').innerHTML=ORDER.map(id=>{ const g=GAMES[id], d=S.data[id];
-    return `<button data-g="${id}" class="${S.game===id?'on':''} ${d?'':'nodata'}">${esc(gname(g))}${d?`<small>${d.rows.length}</small>`:''}</button>`; }).join('');
+    return `<button data-g="${id}" class="${S.game===id?'on':''} ${d?'':'nodata'} ${S.autoGame===id?'today':''}" ${S.autoGame===id?`title="${T('todayTip')}"`:''}>${esc(gname(g))}${d?`<small>${d.rows.length}</small>`:''}</button>`; }).join('');
   const all=[20,30,40,50,100,200,500];
   $('#periods').innerHTML=all.map(n=>`<button data-n="${n}" class="${S.period===n?'on':''}">${n}</button>`).join('')+
     `<button data-n="all" class="${S.period==='all'?'on':''}">${T('all')}</button>`+
@@ -1374,15 +1449,17 @@ function renderAll(){
   const st=lsGet('dc.settings',null);
   if(st){ for(const k of ['lang','game','period','cell','incBonus','tab','heat']) if(st[k]!==undefined) S[k]=st[k]; if(st.rnd) Object.assign(S.rnd,st.rnd); }
   if(!GAMES[S.game]) S.game='lotto';
+  { const q=new URLSearchParams(location.search).get('game'); S.autoGame=GAMES[q]?q:autoGame(); if(!GAMES[q]) S.urlGame=false; else S.urlGame=true; }
   S.tickets=lsGet('dc.tickets',{});
   S.persisted=await DB.open();
   const saved=await DB.all();
   for(const gid in saved){ if(GAMES[gid]) try{ S.data[gid]=hydrate(gid,saved[gid]); }catch(e){} }
+  if(S.data[S.autoGame]) S.game=S.autoGame;
   if(!S.data[S.game]){ const first=ORDER.find(id=>S.data[id]); if(first) S.game=first; }
   renderAll(true);
-  window.__app={S,get V(){return V;},get BL(){return BL;},get L(){return L;},importFiles,GAMES,randomTicket,metrics,pairsStats,togglePick,updateFromRemote,mergeRows};
+  window.__app={autoGame,defaultDate,addProblems,A,DAYS,S,get V(){return V;},get BL(){return BL;},get L(){return L;},importFiles,GAMES,randomTicket,metrics,pairsStats,togglePick,updateFromRemote,mergeRows};
   // first visit on the published site: load the online data automatically
-  if(!isLocalFile()&&!Object.keys(S.data).length) updateFromRemote(true);
+  if(!isLocalFile()&&!Object.keys(S.data).length) { S.firstLoad=true; updateFromRemote(true); }
 })();
 </script>
 </body>

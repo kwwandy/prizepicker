@@ -29,8 +29,10 @@ export const GAMES = {
   mk6:   { mainN: 6, bonusN: 1, maxMain: 49, maxBonus: 49, minRows: 500 },
 };
 /* run day (UTC weekday) -> games drawn the day before.
-   Lotto Wed+Sat, Set for Life Mon+Thu, EuroMillions Tue+Fri, Powerball Mon+Wed+Sat, Mark Six (manual only), Thunderball Tue+Wed+Fri+Sat. Monday is not scheduled. */
-export const AUTO = { 0: ['lotto', 'pb', 'tb'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'tb'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl'], 6: ['euro', 'tb'] };
+   Lotto Wed+Sat, Set for Life Mon+Thu, EuroMillions Tue+Fri, Powerball Mon+Wed+Sat, Mark Six Tue+Thu+Sat, Thunderball Tue+Wed+Fri+Sat. Monday is not scheduled. */
+/* regular draw weekdays (0=Sun); Powerball is the US date, Mark Six the Hong Kong date */
+export const DAYS = { lotto: [3, 6], sfl: [1, 4], euro: [2, 5], pb: [1, 3, 6], tb: [2, 3, 5, 6], mk6: [2, 4, 6] };
+export const AUTO = { 0: ['lotto', 'pb', 'tb', 'mk6'], 1: [], 2: ['sfl', 'pb'], 3: ['euro', 'tb', 'mk6'], 4: ['lotto', 'pb', 'tb'], 5: ['sfl', 'mk6'], 6: ['euro', 'tb'] };
 
 /* ---------------------------------------------------------------- helpers */
 export function parseCSV(text) {
@@ -149,25 +151,62 @@ export function parseMk6Csv(text) {
   return out;
 }
 
-/* kclm.site (third-party JSON): {"data":[{"issue":"26/112","drawResult":"2,5,7,8,21,29,31","drawTime":"2026-10-20 21:30:00","code":"hk6"}, ...]}
-   The array may be at the top level or nested; the 7 numbers are 6 main + extra. */
-export function parseMk6Json(text) {
+/* HKJC GraphQL (the endpoint the HKJC Mark Six results page itself uses; query text copied verbatim from
+   github.com/twn-wi11i4m/HongKongMarkSixAnalysis get_lottery_data.py, MIT licence). Response:
+   {"data":{"lotteryDraws":[{"year":"2026","no":123,"drawDate":"2026-11-19+08:00","drawResult":{"drawnNo":[12,18,32,45,47,49],"xDrawnNo":41}, ...}]}}
+   Draws that have not been drawn yet have no drawResult and are skipped. */
+export const HKJC_QUERY = `fragment lotteryDrawsFragment on LotteryDraw {
+            id
+            year
+            no
+            openDate
+            closeDate
+            drawDate
+            status
+            snowballCode
+            snowballName_en
+            snowballName_ch
+            lotteryPool {
+                sell
+                status
+                totalInvestment
+                jackpot
+                unitBet
+                estimatedPrize
+                derivedFirstPrizeDiv
+                lotteryPrizes {
+                type
+                winningUnit
+                dividend
+                }
+            }
+            drawResult {
+                drawnNo
+                xDrawnNo
+            }
+        }
+
+        query marksixResult($lastNDraw: Int, $startDate: String, $endDate: String, $drawType: LotteryDrawType) {
+            lotteryDraws(
+                lastNDraw: $lastNDraw
+                startDate: $startDate
+                endDate: $endDate
+                drawType: $drawType
+            ) {
+                ...lotteryDrawsFragment
+            }
+        }`;
+export function parseHkjc(text) {
   const j = JSON.parse(text);
-  const find = (v, d = 0) => {
-    if (Array.isArray(v)) return v;
-    if (v && typeof v === 'object' && d < 4) for (const k of Object.keys(v)) { const r = find(v[k], d + 1); if (r) return r; }
-    return null;
-  };
-  const arr = find(j);
-  if (!arr) throw new Error('no array in JSON');
+  if (j.errors && j.errors.length) throw new Error('GraphQL errors: ' + JSON.stringify(j.errors).slice(0, 300));
+  const arr = j && j.data && j.data.lotteryDraws;
+  if (!Array.isArray(arr)) throw new Error('no data.lotteryDraws in the response');
   const out = [];
   for (const r of arr) {
-    const date = parseDateAny(r.drawTime || r.draw_time || r.drawDate || r.date);
-    const n = ints(String(r.drawResult || r.result || '').split(/[,\s+]+/).filter(Boolean));
-    if (!date || n.length !== 7) continue;
-    const im = String(r.issue || '').trim().match(/^(\d{4}|\d{2})\s*[\/-]?\s*(\d{1,3})$/);
-    out.push({ date, dn: im ? String(parseInt(im[1], 10) % 100).padStart(2, '0') + '/' + parseInt(im[2], 10) : null,
-      m: n.slice(0, 6).sort((x, y) => x - y), b: [n[6]] });
+    const res = r && r.drawResult; if (!res || !Array.isArray(res.drawnNo) || res.drawnNo.length !== 6 || !Number.isInteger(res.xDrawnNo)) continue;
+    const date = parseDateAny(r.drawDate); const yy = parseInt(r.year, 10), no = parseInt(r.no, 10);
+    if (!date) continue;
+    out.push({ date, dn: yy > 0 && no > 0 ? String(yy % 100).padStart(2, '0') + '/' + no : null, m: ints(res.drawnNo).sort((x, y) => x - y), b: [res.xDrawnNo] });
   }
   return out;
 }
@@ -180,8 +219,9 @@ export const SOURCES = {
   tb:    [{ name: 'national-lottery.co.uk (Thunderball CSV)', url: NL + 'thunderball/draw-history/csv', min: 1, parse: parseUk('tb') }],
   euro:  [{ name: 'national-lottery.co.uk (EuroMillions CSV)', url: NL + 'euromillions/draw-history/csv', min: 1, parse: parseUk('euro') }],
   pb:    [{ name: 'data.ny.gov (Powerball)', url: 'https://data.ny.gov/resource/d6yy-54nr.json?$order=draw_date%20DESC&$limit=5000', parse: parsePbJson }],
-  mk6:   [{ name: 'renavon.com (Mark Six CSV)', url: 'https://renavon.com/data/hkjc/hkjc_marksix_results/download/csv', parse: parseMk6Csv },
-         { name: 'kclm.site (Mark Six JSON, third party, latest draws only)', url: 'https://kclm.site/api/trial/drawResult?code=hk6&format=json&rows=300', min: 5, strict: true, parse: parseMk6Json }],
+  mk6:   [{ name: 'HKJC GraphQL (Mark Six, last 30 draws)', url: 'https://info.cld.hkjc.com/graphql/base/', min: 5, strict: { overlap: 3, changed: 3 }, parse: parseHkjc,
+           request: { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operationName: 'marksixResult', variables: { lastNDraw: 30 }, query: HKJC_QUERY }) } },
+         { name: 'renavon.com (Mark Six CSV)', url: 'https://renavon.com/data/hkjc/hkjc_marksix_results/download/csv', parse: parseMk6Csv }],
 };
 
 /* ---------------------------------------------------------------- validation & merge */
@@ -209,11 +249,11 @@ export function serialise(gid, source, rows) {
 /* ---------------------------------------------------------------- network */
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function fetchText(url, retries = 2) {
+async function fetchText(url, opts = {}, retries = 2) {
   for (let i = 0; ; i++) {
     try {
       const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 60000);
-      const res = await fetch(url, { headers: { 'user-agent': UA, accept: 'text/csv,application/json,text/plain,*/*', 'accept-language': 'en-GB,en;q=0.9' }, signal: ctl.signal, redirect: 'follow' });
+      const res = await fetch(url, { method: opts.method || 'GET', body: opts.body, headers: { 'user-agent': UA, accept: 'text/csv,application/json,text/plain,*/*', 'accept-language': 'en-GB,en;q=0.9', ...(opts.headers || {}) }, signal: ctl.signal, redirect: 'follow' });
       clearTimeout(to);
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       return await res.text();
@@ -229,7 +269,7 @@ export async function updateGame(gid, { dry = false, force = false, fetcher = fe
   let lastErr;
   for (const s of SOURCES[gid]) {
     try {
-      const text = await fetcher(s.url);
+      const text = await fetcher(s.url, s.request);
       let fresh;
       try { fresh = s.parse(text, gid); }
       catch (e) { throw new Error(`${e.message}\n    first lines of the response: ${JSON.stringify(text.slice(0, 300))}`); }
@@ -240,9 +280,10 @@ export async function updateGame(gid, { dry = false, force = false, fetcher = fe
       if (m.changed > 5 && !force) throw new Error(`${s.name} disagrees with the stored data on ${m.changed} draws, so nothing was written. Check the source, or re-run with force.`);
       if (m.rows.length < curRows.length) throw new Error('merge would shrink the data, refusing');
       if (s.strict) {
+        /* a source we cannot test from everywhere: only trust it if it overlaps the stored data and mostly agrees with it */
         const have = new Set(curRows.map((r) => r.date)); const overlap = valid.filter((r) => have.has(r.date)).length;
-        if (overlap < 3) throw new Error(`${s.name}: only ${overlap} draws overlap the stored data, cannot cross-check, nothing written`);
-        if (m.changed > 0) throw new Error(`${s.name}: ${m.changed} draws differ from the stored data, nothing written`);
+        if (overlap < s.strict.overlap) throw new Error(`${s.name}: only ${overlap} draws overlap the stored data, cannot cross-check, nothing written`);
+        if (m.changed > s.strict.changed && !force) throw new Error(`${s.name}: ${m.changed} draws differ from the stored data (more than ${s.strict.changed}), nothing written`);
       }
       const latest = m.rows[m.rows.length - 1];
       if (m.added + m.changed === 0) { console.log(`${gid}: already up to date (latest ${latest.date}) [${s.name}]`); return { gid, status: 'same', latest: latest.date }; }
@@ -262,7 +303,7 @@ async function main() {
   let sel = String(opt('games') === true || opt('games') == null ? 'auto' : opt('games')).trim();
   let games;
   if (sel === 'auto') games = AUTO[new Date().getUTCDay()];
-  else if (sel === 'all') games = Object.keys(GAMES).filter((g) => g !== 'mk6'); /* mk6: no source reachable from GitHub; add draws by hand, or run --games mk6 explicitly */
+  else if (sel === 'all') games = Object.keys(GAMES);
   else games = sel.split(',').map((x) => x.trim()).filter(Boolean);
   const bad = games.filter((g) => !GAMES[g]); if (bad.length) { console.error('unknown game: ' + bad.join(', ')); process.exit(1); }
   console.log(`games to update (${sel}): ${games.join(', ') || 'none'}`);

@@ -25,7 +25,7 @@
 | 五 | Set for Life |
 | 六 | EuroMillions、Thunderball |
 
-**六合彩唔會自動更新**（暫時冇 GitHub 連得到嘅來源），請用下面「手動新增一期」，或者匯入 Renavon CSV。想試自動來源：Run workflow，games 填 `mk6`。
+**六合彩**喺星期日、三、五（HK 時間）自動更新：首選 HKJC 官方網站用嘅 GraphQL 介面（最近 30 期，同現有資料嚴格對照，差異太大會拒收），後備係 Renavon CSV。如果 GitHub 嘅 IP 被封鎖，Actions 會變紅，改用手動新增或匯入 Renavon CSV。第一次請 Run workflow，games 填 `mk6` 睇結果。
 
 ## 手動更新
 - GitHub：Actions → Run workflow，games 可填 `all` 或 `lotto,tb`。
@@ -35,6 +35,11 @@
 網頁頂部「新增(Admin)」→ 揀遊戲、日期、點號碼 →「提交到 GitHub」。會開一個已填好嘅 GitHub Issue，撳「Submit new issue」。
 `.github/workflows/add-draw.yml` 會驗證、寫入 `data/`、重新發佈，再喺 Issue 回覆結果並關閉（1–2 分鐘）。之後網頁撳「更新資料」。
 - 只處理 repo 擁有者開嘅、標題以 `[add-draw]` 開頭嘅 Issue。
+- 預設日期 = 下一個應有嘅攪珠日；對話框會顯示最近三期對照，並警告：唔係攪珠日（要剔「特別攪珠日」）、同舊期一模一樣嘅號碼、期數接唔上。伺服器端再驗一次。
+- 輸入錯誤可喺對話框底部「刪除一期」提交刪除。
+
+## 自動分頁
+開網頁時按裝置本地時間揀遊戲：一 Set for Life（20:00 後 Powerball）、二 EuroMillions、三 Lotto（20:00 後 Powerball）、四 六合彩、五 EuroMillions、六 Lotto（20:00 後 Powerball）、日 Set for Life。Thunderball 唔會自動揀。自動揀嘅分頁有細黃點；手動轉分頁之後就跟你揀。可用 `?game=mk6` 強制指定。
 - 同日已有不同號碼會拒絕，除非勾選「覆蓋」（Issue 內 `force: yes`）。
 - 每次修改都有 Issue 同 commit 記錄。
 
@@ -42,6 +47,6 @@
 直接開 `index.html`，照舊可以 **匯入 CSV**。想用已發佈資料：撳「網站網址」輸入你嘅 GitHub Pages 網址一次，再撳「更新資料」。
 
 ## 注意
-- 資料來源：英國 national-lottery.co.uk CSV、紐約州 data.ny.gov（Powerball）、Renavon 嘅六合彩 CSV（第三方，授權未確認）。如果某來源改格式或封鎖，該遊戲會更新失敗（Actions 變紅、發電郵），但舊資料同網頁唔受影響，仍可手動匯入 CSV。
+- 資料來源：英國 national-lottery.co.uk CSV、紐約州 data.ny.gov（Powerball）、HKJC 六合彩 GraphQL（非官方公開 API，低頻個人用途）同 Renavon 嘅六合彩 CSV（第三方，授權未確認）。如果某來源改格式或封鎖，該遊戲會更新失敗（Actions 變紅、發電郵），但舊資料同網頁唔受影響，仍可手動匯入 CSV。
 - 更新時如來源同已存資料有超過 5 期唔一致，會拒絕寫入，需確認後用 `force`。
 - GitHub 規定 repo 60 日冇活動會暫停定時工作；到時去 Actions 重新啟用，或隨便 commit 一次。
